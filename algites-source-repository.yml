@@ -1,10 +1,10 @@
-sourceRepository:
-  id: pub.lib.Security
-  groupId: eu.algites.lib.security
-  name: Algites public security libraries
+SourceRepository:
+  Id: pub.lib.Security
+  Name: Algites public security libraries
 
-versionContext:
-  releaseLine: "1"
-  revision: 0
-  qualifierKind: SNAPSHOT
-  qualifierLabel: SNAPSHOT
+GroupId: eu.algites.lib.security
+
+Version:
+  ReleaseLine: "1"
+  Revision: 0
+  QualifierKind: snapshot

@@ -49,7 +49,7 @@ class AIcCredentialService:
         for field in profile.type.supported_fields:
             value = credential.get_text(field)
             if value is not None:
-                typed[field.id] = {"source": AInCredentialValueSource.DIRECT_VALUE.name, "value": value}
+                typed[field.id] = {"Source": AInCredentialValueSource.DIRECT_VALUE.id, "Value": value}
         profile_node[profile.type.id] = typed
         self._write_document_object(root)
 

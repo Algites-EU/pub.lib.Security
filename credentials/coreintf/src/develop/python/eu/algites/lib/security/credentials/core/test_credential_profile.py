@@ -15,4 +15,4 @@ def test_type_contract():
     assert AInCredentialType.BASIC.required_fields == (AInCredentialField.USERNAME, AInCredentialField.PASSWORD)
     assert AInCredentialType.API_KEY.required_fields == (AInCredentialField.API_KEY,)
     assert AInCredentialType.CERTIFICATE.optional_fields == (AInCredentialField.PRIVATE_KEY, AInCredentialField.PRIVATE_KEY_PASSWORD)
-    assert AInCredentialValueSource.SECRET_CONTENT.name == "SECRET_CONTENT"
+    assert AInCredentialValueSource.SECRET_CONTENT.id == "secret_content"
