@@ -1,0 +1,55 @@
+ain_credential_store_availability_status
+========================================
+
+.. py:module:: ain_credential_store_availability_status
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   ain_credential_store_availability_status.AInCredentialStoreAvailabilityStatus
+
+
+Module Contents
+---------------
+
+.. py:class:: AInCredentialStoreAvailabilityStatus
+
+   Bases: :py:obj:`enum.Enum`
+
+
+   Availability status reported by a persistent credential-store backend.
+
+
+   .. py:attribute:: AVAILABLE
+      :value: 'AVAILABLE'
+
+
+
+   .. py:attribute:: UNSUPPORTED_PLATFORM
+      :value: 'UNSUPPORTED_PLATFORM'
+
+
+
+   .. py:attribute:: MISSING_DEPENDENCY
+      :value: 'MISSING_DEPENDENCY'
+
+
+
+   .. py:attribute:: SERVICE_UNAVAILABLE
+      :value: 'SERVICE_UNAVAILABLE'
+
+
+
+   .. py:attribute:: SERVICE_LOCKED
+      :value: 'SERVICE_LOCKED'
+
+
+
+   .. py:attribute:: ERROR
+      :value: 'ERROR'
+
+
+

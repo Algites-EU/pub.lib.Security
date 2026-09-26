@@ -1,0 +1,50 @@
+ain_credential_value_source
+===========================
+
+.. py:module:: ain_credential_value_source
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   ain_credential_value_source.AInCredentialValueSource
+
+
+Module Contents
+---------------
+
+.. py:class:: AInCredentialValueSource
+
+   Bases: :py:obj:`enum.Enum`
+
+
+   Algorithms for resolving a credential field value.
+
+
+   .. py:attribute:: DIRECT_VALUE
+      :value: 'DIRECT_VALUE'
+
+
+
+   .. py:attribute:: FILE_CONTENT
+      :value: 'FILE_CONTENT'
+
+
+
+   .. py:attribute:: SECRET_CONTENT
+      :value: 'SECRET_CONTENT'
+
+
+
+   .. py:attribute:: ENVIRONMENT_VARIABLE_CONTENT
+      :value: 'ENVIRONMENT_VARIABLE_CONTENT'
+
+
+
+   .. py:method:: from_id(value: str) -> AInCredentialValueSource
+      :classmethod:
+
+
+

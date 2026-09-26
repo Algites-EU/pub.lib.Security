@@ -1,0 +1,46 @@
+aic_credential_store_availability
+=================================
+
+.. py:module:: aic_credential_store_availability
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   aic_credential_store_availability.AIcCredentialStoreAvailability
+
+
+Module Contents
+---------------
+
+.. py:class:: AIcCredentialStoreAvailability
+
+   Diagnostic availability result for a persistent credential-store backend.
+
+
+   .. py:attribute:: status
+      :type:  eu.algites.lib.security.credentials.core.ain_credential_store_availability_status.AInCredentialStoreAvailabilityStatus
+
+
+   .. py:attribute:: message
+      :type:  str
+
+
+   .. py:attribute:: remediation
+      :type:  tuple[str, Ellipsis]
+      :value: ()
+
+
+
+   .. py:property:: is_available
+      :type: bool
+
+
+
+   .. py:method:: available(message: str) -> AIcCredentialStoreAvailability
+      :classmethod:
+
+
+

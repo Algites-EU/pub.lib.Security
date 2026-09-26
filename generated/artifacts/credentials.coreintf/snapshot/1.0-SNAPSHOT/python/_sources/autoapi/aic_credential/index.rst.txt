@@ -1,0 +1,37 @@
+aic_credential
+==============
+
+.. py:module:: aic_credential
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   aic_credential.AIcCredential
+
+
+Module Contents
+---------------
+
+.. py:class:: AIcCredential(values: collections.abc.Mapping[eu.algites.lib.security.credentials.core.ain_credential_field.AInCredentialField, str | bytes | bytearray])
+
+   In-memory credential values with best-effort explicit wiping support.
+
+
+   .. py:method:: contains(field: eu.algites.lib.security.credentials.core.ain_credential_field.AInCredentialField) -> bool
+
+
+   .. py:method:: get_value(field: eu.algites.lib.security.credentials.core.ain_credential_field.AInCredentialField) -> bytearray | None
+
+
+   .. py:method:: get_text(field: eu.algites.lib.security.credentials.core.ain_credential_field.AInCredentialField) -> str | None
+
+
+   .. py:method:: satisfies(profile: eu.algites.lib.security.credentials.core.aic_credential_profile.AIcCredentialProfile) -> bool
+
+
+   .. py:method:: close() -> None
+
+

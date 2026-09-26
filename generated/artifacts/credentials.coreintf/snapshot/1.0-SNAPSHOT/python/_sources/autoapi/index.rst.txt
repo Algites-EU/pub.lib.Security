@@ -1,0 +1,20 @@
+API Reference
+=============
+
+This page contains auto-generated API reference documentation [#f1]_.
+
+.. toctree::
+   :titlesonly:
+
+   /autoapi/aic_credential/index
+   /autoapi/ain_credential_type/index
+   /autoapi/ain_credential_field/index
+   /autoapi/aii_credential_store/index
+   /autoapi/aic_credential_profile/index
+   /autoapi/aii_credential_provider/index
+   /autoapi/aix_credential_exception/index
+   /autoapi/ain_credential_value_source/index
+   /autoapi/aic_credential_store_availability/index
+   /autoapi/ain_credential_store_availability_status/index
+
+.. [#f1] Created with `sphinx-autoapi <https://github.com/readthedocs/sphinx-autoapi>`_

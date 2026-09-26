@@ -1,0 +1,57 @@
+aic_credential_store_provider
+=============================
+
+.. py:module:: aic_credential_store_provider
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   aic_credential_store_provider.AIcCredentialStoreProvider
+
+
+Module Contents
+---------------
+
+.. py:class:: AIcCredentialStoreProvider(stores: collections.abc.Iterable[eu.algites.lib.security.credentials.core.aii_credential_store.AIiCredentialStore] = ())
+
+   Access facade for the highest-priority available credential-store backend.
+
+
+   .. py:attribute:: CREDENTIAL_DOCUMENT_STORAGE_KEY
+      :value: 'document/ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS'
+
+
+
+   .. py:method:: available_store() -> eu.algites.lib.security.credentials.core.aii_credential_store.AIiCredentialStore | None
+
+
+   .. py:method:: store_availabilities() -> tuple[eu.algites.lib.security.credentials.core.aic_credential_store_availability.AIcCredentialStoreAvailability, Ellipsis]
+
+
+   .. py:method:: require_available_store() -> eu.algites.lib.security.credentials.core.aii_credential_store.AIiCredentialStore
+
+
+   .. py:method:: read_credential_document() -> bytes | None
+
+
+   .. py:method:: write_credential_document(value: bytes) -> None
+
+
+   .. py:method:: delete_credential_document() -> None
+
+
+   .. py:method:: read_named_secret(secret_id: str) -> bytes | None
+
+
+   .. py:method:: write_named_secret(secret_id: str, value: bytes) -> None
+
+
+   .. py:method:: delete_named_secret(secret_id: str) -> None
+
+
+   .. py:method:: build_unavailable_store_message() -> str
+
+

@@ -1,0 +1,70 @@
+ain_credential_field
+====================
+
+.. py:module:: ain_credential_field
+
+
+Classes
+-------
+
+.. autoapisummary::
+
+   ain_credential_field.AInCredentialField
+
+
+Module Contents
+---------------
+
+.. py:class:: AInCredentialField
+
+   Bases: :py:obj:`enum.Enum`
+
+
+   Canonical fields supported by Algites credential types.
+
+
+   .. py:attribute:: USERNAME
+      :value: 'username'
+
+
+
+   .. py:attribute:: PASSWORD
+      :value: 'password'
+
+
+
+   .. py:attribute:: TOKEN
+      :value: 'token'
+
+
+
+   .. py:attribute:: API_KEY
+      :value: 'apiKey'
+
+
+
+   .. py:attribute:: CERTIFICATE
+      :value: 'certificate'
+
+
+
+   .. py:attribute:: PRIVATE_KEY
+      :value: 'privateKey'
+
+
+
+   .. py:attribute:: PRIVATE_KEY_PASSWORD
+      :value: 'privateKeyPassword'
+
+
+
+   .. py:property:: id
+      :type: str
+
+
+
+   .. py:method:: from_id(value: str) -> AInCredentialField
+      :classmethod:
+
+
+

@@ -1,0 +1,21 @@
+manifestVersion: 1
+artifact:
+  repositoryId: pub.lib.Security
+  localArtifactId: credentials.coreimpl
+  artifactCoordinateId: pub.lib.Security_credentials.coreimpl
+  version: 1.0-SNAPSHOT
+  sourcePath: credentials/coreimpl
+  structureKind: artifact
+  name: "Algites credential core implementation"
+  description: "General credential resolution, document, codec, and secure-store selection implementation."
+sourceMetadata:
+  descriptorHierarchy:
+    - structureKind: repository
+      path: algites-source-repository.yml
+      sha256: 21c7f5be947f8d0480826bb77a8a95d6dc52bee7de6a66e06af19ed4cf92777c
+    - structureKind: artifact-set
+      path: credentials/algites-artifact-set.yml
+      sha256: 1e7562530d658a8337886611814bc25178fcf5725305bd6b5f9d20e0195bbf43
+    - structureKind: artifact
+      path: credentials/coreimpl/algites-artifact.yml
+      sha256: 3f3e31ce78266a09067dd7924db810a3c9e6feffcb4d1946f66966362d7e24f6
