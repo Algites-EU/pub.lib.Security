@@ -53,13 +53,13 @@ class AIcCredentialDocumentProvider(AIiCredentialProvider):
 
     def _resolve_value(self, profile: AIcCredentialProfile, field, node: object, secrets: dict) -> str:
         if not isinstance(node, dict):
-            raise self._field_error(profile, field, "must be an object containing source and value.")
-        source_value = node.get("source")
-        reference = node.get("value")
+            raise self._field_error(profile, field, "must be an object containing Source and Value.")
+        source_value = node.get("Source")
+        reference = node.get("Value")
         if not isinstance(source_value, str):
-            raise self._field_error(profile, field, "is missing string property 'source'.")
+            raise self._field_error(profile, field, "is missing string property 'Source'.")
         if not isinstance(reference, str):
-            raise self._field_error(profile, field, "is missing string property 'value'.")
+            raise self._field_error(profile, field, "is missing string property 'Value'.")
         try:
             source = AInCredentialValueSource.from_id(source_value)
         except ValueError as exception:
@@ -97,7 +97,7 @@ class AIcCredentialDocumentProvider(AIiCredentialProvider):
             return None
         if not isinstance(profile_node, dict):
             raise AIxCredentialException(f"Credential profile '{profile.id}' must be a JSON object.")
-        typed = profile_node.get(profile.type.id)
+        typed = profile_node.get(profile.type.property_name)
         if typed is None:
             return None
         if not isinstance(typed, dict):

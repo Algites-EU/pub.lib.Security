@@ -6,13 +6,13 @@ import java.util.Locale;
  * Canonical fields supported by Algites credential types.
  */
 public enum AInCredentialField {
-    USERNAME("username"),
-    PASSWORD("password"),
-    TOKEN("token"),
-    API_KEY("apiKey"),
-    CERTIFICATE("certificate"),
-    PRIVATE_KEY("privateKey"),
-    PRIVATE_KEY_PASSWORD("privateKeyPassword");
+    USERNAME("Username"),
+    PASSWORD("Password"),
+    TOKEN("Token"),
+    API_KEY("ApiKey"),
+    CERTIFICATE("Certificate"),
+    PRIVATE_KEY("PrivateKey"),
+    PRIVATE_KEY_PASSWORD("PrivateKeyPassword");
 
     private final String id;
 

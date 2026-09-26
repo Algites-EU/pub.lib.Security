@@ -35,7 +35,7 @@ class AIcCredentialService:
         )
 
     def is_stored(self, profile: AIcCredentialProfile) -> bool:
-        typed = self._read_document_object().get(profile.id, {}).get(profile.type.id, {})
+        typed = self._read_document_object().get(profile.id, {}).get(profile.type.property_name, {})
         return isinstance(typed, dict) and all(field.id in typed for field in profile.type.required_fields)
 
     def store(self, profile: AIcCredentialProfile, credential: AIcCredential) -> None:
@@ -50,7 +50,7 @@ class AIcCredentialService:
             value = credential.get_text(field)
             if value is not None:
                 typed[field.id] = {"Source": AInCredentialValueSource.DIRECT_VALUE.id, "Value": value}
-        profile_node[profile.type.id] = typed
+        profile_node[profile.type.property_name] = typed
         self._write_document_object(root)
 
     def remove(self, profile: AIcCredentialProfile) -> None:
@@ -58,7 +58,7 @@ class AIcCredentialService:
         profile_node = root.get(profile.id)
         if not isinstance(profile_node, dict):
             return
-        profile_node.pop(profile.type.id, None)
+        profile_node.pop(profile.type.property_name, None)
         if not profile_node:
             root.pop(profile.id, None)
         if root:

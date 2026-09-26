@@ -8,27 +8,32 @@ class AInCredentialType(Enum):
 
     BASIC = (
         "basic",
+        "Basic",
         (AInCredentialField.USERNAME, AInCredentialField.PASSWORD),
         (),
     )
     BEARER = (
         "bearer",
+        "Bearer",
         (AInCredentialField.TOKEN,),
         (),
     )
     API_KEY = (
-        "api-key",
+        "api_key",
+        "ApiKey",
         (AInCredentialField.API_KEY,),
         (),
     )
     CERTIFICATE = (
         "certificate",
+        "Certificate",
         (AInCredentialField.CERTIFICATE,),
         (AInCredentialField.PRIVATE_KEY, AInCredentialField.PRIVATE_KEY_PASSWORD),
     )
 
-    def __init__(self, type_id: str, required_fields: tuple[AInCredentialField, ...], optional_fields: tuple[AInCredentialField, ...]):
+    def __init__(self, type_id: str, property_name: str, required_fields: tuple[AInCredentialField, ...], optional_fields: tuple[AInCredentialField, ...]):
         self._type_id = type_id
+        self._property_name = property_name
         self._required_fields = required_fields
         self._optional_fields = optional_fields
 
@@ -37,8 +42,12 @@ class AInCredentialType(Enum):
         return self._type_id
 
     @property
+    def property_name(self) -> str:
+        return self._property_name
+
+    @property
     def environment_segment(self) -> str:
-        return self._type_id.upper().replace("-", "_")
+        return self._type_id.upper()
 
     @property
     def required_fields(self) -> tuple[AInCredentialField, ...]:

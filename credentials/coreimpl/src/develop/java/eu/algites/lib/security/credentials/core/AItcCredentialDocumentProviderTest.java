@@ -23,8 +23,8 @@ public final class AItcCredentialDocumentProviderTest {
         AIcCredentialDocumentProvider locProvider = new AIcCredentialDocumentProvider(
             Map.of(
                 "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS",
-                "{\"profile\":{\"basic\":{\"username\":{\"source\":\"DIRECT_VALUE\",\"value\":\"user\"}," +
-                    "\"password\":{\"source\":\"SECRET_CONTENT\",\"value\":\"PASSWORD_SECRET\"}}}}",
+                "{\"profile\":{\"Basic\":{\"Username\":{\"Source\":\"direct_value\",\"Value\":\"user\"}," +
+                    "\"Password\":{\"Source\":\"secret_content\",\"Value\":\"PASSWORD_SECRET\"}}}}",
                 "_TMP_ALGITES_CREDENTIAL_SECRETS_JSON",
                 "{\"PASSWORD_SECRET\":\"secret\"}"
             ),
@@ -47,8 +47,8 @@ public final class AItcCredentialDocumentProviderTest {
             AIcCredentialDocumentProvider locProvider = new AIcCredentialDocumentProvider(
                 Map.of(
                     "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS",
-                    "{\"profile\":{\"certificate\":{\"certificate\":{\"source\":\"FILE_CONTENT\",\"value\":\"certificate.pem\"}," +
-                        "\"privateKeyPassword\":{\"source\":\"ENVIRONMENT_VARIABLE_CONTENT\",\"value\":\"KEY_PASSWORD\"}}}}",
+                    "{\"profile\":{\"Certificate\":{\"Certificate\":{\"Source\":\"file_content\",\"Value\":\"certificate.pem\"}," +
+                        "\"PrivateKeyPassword\":{\"Source\":\"environment_variable_content\",\"Value\":\"KEY_PASSWORD\"}}}}",
                     "KEY_PASSWORD",
                     "password"
                 ),
@@ -73,8 +73,8 @@ public final class AItcCredentialDocumentProviderTest {
         AIcCredentialDocumentProvider locProvider = new AIcCredentialDocumentProvider(
             Map.of(
                 "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS",
-                "{\"profile\":{\"basic\":{\"username\":{\"source\":\"DIRECT_VALUE\",\"value\":\"user\"}," +
-                    "\"password\":{\"source\":\"SECRET_CONTENT\",\"value\":\"PASSWORD_SECRET\"}}}}"
+                "{\"profile\":{\"Basic\":{\"Username\":{\"Source\":\"direct_value\",\"Value\":\"user\"}," +
+                    "\"Password\":{\"Source\":\"secret_content\",\"Value\":\"PASSWORD_SECRET\"}}}}"
             ),
             Path.of("."),
             new AIcCredentialStoreProvider(List.of(locStore))
@@ -91,8 +91,8 @@ public final class AItcCredentialDocumentProviderTest {
         AIcTestCredentialStore locStore = new AIcTestCredentialStore();
         locStore.write(
             AIcCredentialStoreProvider.CREDENTIAL_DOCUMENT_STORAGE_KEY,
-            ("{\"profile\":{\"basic\":{\"username\":{\"source\":\"DIRECT_VALUE\",\"value\":\"user\"}," +
-                "\"password\":{\"source\":\"SECRET_CONTENT\",\"value\":\"PASSWORD_SECRET\"}}}}")
+            ("{\"profile\":{\"Basic\":{\"Username\":{\"Source\":\"direct_value\",\"Value\":\"user\"}," +
+                "\"Password\":{\"Source\":\"secret_content\",\"Value\":\"PASSWORD_SECRET\"}}}}")
                 .getBytes(StandardCharsets.UTF_8)
         );
         locStore.write("secret/PASSWORD_SECRET", "local-secret".getBytes(StandardCharsets.UTF_8));

@@ -67,7 +67,7 @@ public final class AIcCredentialDocumentProvider implements AIiCredentialProvide
             throw new AIxCredentialException("Credential profile '" + aProfile.getId() + "' must be a JSON object.");
         }
 
-        JsonNode locTypedCredential = locProfile.get(aProfile.getType().getId());
+        JsonNode locTypedCredential = locProfile.get(aProfile.getType().getPropertyName());
         if (locTypedCredential == null || locTypedCredential.isNull()) {
             return Optional.empty();
         }
@@ -133,15 +133,15 @@ public final class AIcCredentialDocumentProvider implements AIiCredentialProvide
         JsonNode aSecrets
     ) {
         if (!aFieldNode.isObject()) {
-            throw fieldError(aProfile, aField, "must be an object containing source and value.");
+            throw fieldError(aProfile, aField, "must be an object containing Source and Value.");
         }
-        JsonNode locSourceNode = aFieldNode.get("source");
-        JsonNode locValueNode = aFieldNode.get("value");
+        JsonNode locSourceNode = aFieldNode.get("Source");
+        JsonNode locValueNode = aFieldNode.get("Value");
         if (locSourceNode == null || !locSourceNode.isTextual()) {
-            throw fieldError(aProfile, aField, "is missing string property 'source'.");
+            throw fieldError(aProfile, aField, "is missing string property 'Source'.");
         }
         if (locValueNode == null || !locValueNode.isTextual()) {
-            throw fieldError(aProfile, aField, "is missing string property 'value'.");
+            throw fieldError(aProfile, aField, "is missing string property 'Value'.");
         }
 
         AInCredentialValueSource locSource;
@@ -162,7 +162,7 @@ public final class AIcCredentialDocumentProvider implements AIiCredentialProvide
 
     private char[] readFileContent(AIcCredentialProfile aProfile, AInCredentialField aField, String aReference) {
         if (aReference.isBlank()) {
-            throw fieldError(aProfile, aField, "FILE_CONTENT path must not be empty.");
+            throw fieldError(aProfile, aField, "file_content path must not be empty.");
         }
         Path locPath = Path.of(aReference);
         if (!locPath.isAbsolute()) {
@@ -186,7 +186,7 @@ public final class AIcCredentialDocumentProvider implements AIiCredentialProvide
         JsonNode aSecrets
     ) {
         if (aReference.isBlank()) {
-            throw fieldError(aProfile, aField, "SECRET_CONTENT key must not be empty.");
+            throw fieldError(aProfile, aField, "secret_content key must not be empty.");
         }
         JsonNode locSecret = aSecrets.get(aReference);
         if (locSecret != null && !locSecret.isNull()) {
@@ -211,7 +211,7 @@ public final class AIcCredentialDocumentProvider implements AIiCredentialProvide
         String aReference
     ) {
         if (aReference.isBlank()) {
-            throw fieldError(aProfile, aField, "ENVIRONMENT_VARIABLE_CONTENT variable name must not be empty.");
+            throw fieldError(aProfile, aField, "environment_variable_content variable name must not be empty.");
         }
         String locValue = environment.get(aReference);
         if (locValue == null) {

@@ -4,13 +4,13 @@ from enum import Enum
 class AInCredentialField(Enum):
     """Canonical fields supported by Algites credential types."""
 
-    USERNAME = "username"
-    PASSWORD = "password"
-    TOKEN = "token"
-    API_KEY = "apiKey"
-    CERTIFICATE = "certificate"
-    PRIVATE_KEY = "privateKey"
-    PRIVATE_KEY_PASSWORD = "privateKeyPassword"
+    USERNAME = "Username"
+    PASSWORD = "Password"
+    TOKEN = "Token"
+    API_KEY = "ApiKey"
+    CERTIFICATE = "Certificate"
+    PRIVATE_KEY = "PrivateKey"
+    PRIVATE_KEY_PASSWORD = "PrivateKeyPassword"
 
     @property
     def id(self) -> str:

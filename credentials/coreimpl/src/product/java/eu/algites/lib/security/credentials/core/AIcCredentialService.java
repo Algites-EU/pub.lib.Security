@@ -44,7 +44,7 @@ public final class AIcCredentialService {
         if (locProfile == null || !locProfile.isObject()) {
             return false;
         }
-        JsonNode locType = locProfile.get(aProfile.getType().getId());
+        JsonNode locType = locProfile.get(aProfile.getType().getPropertyName());
         if (locType == null || !locType.isObject()) {
             return false;
         }
@@ -79,7 +79,7 @@ public final class AIcCredentialService {
                 Arrays.fill(locChars, '\0');
             }
         }
-        locProfile.set(aProfile.getType().getId(), locTypedCredential);
+        locProfile.set(aProfile.getType().getPropertyName(), locTypedCredential);
         writeCredentialDocumentObject(locRoot);
     }
 
@@ -90,7 +90,7 @@ public final class AIcCredentialService {
         if (!(locProfileNode instanceof ObjectNode locProfile)) {
             return;
         }
-        locProfile.remove(aProfile.getType().getId());
+        locProfile.remove(aProfile.getType().getPropertyName());
         if (locProfile.size() == 0) {
             locRoot.remove(aProfile.getId());
         }

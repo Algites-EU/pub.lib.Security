@@ -9,35 +9,42 @@ import java.util.Locale;
 public enum AInCredentialType {
     BASIC(
         "basic",
+        "Basic",
         List.of(AInCredentialField.USERNAME, AInCredentialField.PASSWORD),
         List.of()
     ),
     BEARER(
         "bearer",
+        "Bearer",
         List.of(AInCredentialField.TOKEN),
         List.of()
     ),
     API_KEY(
-        "api-key",
+        "api_key",
+        "ApiKey",
         List.of(AInCredentialField.API_KEY),
         List.of()
     ),
     CERTIFICATE(
         "certificate",
+        "Certificate",
         List.of(AInCredentialField.CERTIFICATE),
         List.of(AInCredentialField.PRIVATE_KEY, AInCredentialField.PRIVATE_KEY_PASSWORD)
     );
 
     private final String id;
+    private final String propertyName;
     private final List<AInCredentialField> requiredFields;
     private final List<AInCredentialField> optionalFields;
 
     AInCredentialType(
         String aId,
+        String aPropertyName,
         List<AInCredentialField> aRequiredFields,
         List<AInCredentialField> aOptionalFields
     ) {
         id = aId;
+        propertyName = aPropertyName;
         requiredFields = List.copyOf(aRequiredFields);
         optionalFields = List.copyOf(aOptionalFields);
     }
@@ -46,8 +53,12 @@ public enum AInCredentialType {
         return id;
     }
 
+    public String getPropertyName() {
+        return propertyName;
+    }
+
     public String getEnvironmentSegment() {
-        return id.toUpperCase(Locale.ROOT).replace('-', '_');
+        return id.toUpperCase(Locale.ROOT);
     }
 
     public List<AInCredentialField> getRequiredFields() {

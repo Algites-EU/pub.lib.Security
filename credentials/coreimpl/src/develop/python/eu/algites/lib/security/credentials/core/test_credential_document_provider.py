@@ -8,7 +8,7 @@ from eu.algites.lib.security.credentials.core.ain_credential_type import AInCred
 
 def test_resolves_direct_and_secret_content():
     provider = AIcCredentialDocumentProvider({
-        "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS": '{"profile":{"basic":{"username":{"source":"DIRECT_VALUE","value":"user"},"password":{"source":"SECRET_CONTENT","value":"PASSWORD_SECRET"}}}}',
+        "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS": '{"profile":{"Basic":{"Username":{"Source":"direct_value","Value":"user"},"Password":{"Source":"secret_content","Value":"PASSWORD_SECRET"}}}}',
         "_TMP_ALGITES_CREDENTIAL_SECRETS_JSON": '{"PASSWORD_SECRET":"secret"}',
     }, Path("."))
     profile = AIcCredentialProfile("profile", AInCredentialType.BASIC)
