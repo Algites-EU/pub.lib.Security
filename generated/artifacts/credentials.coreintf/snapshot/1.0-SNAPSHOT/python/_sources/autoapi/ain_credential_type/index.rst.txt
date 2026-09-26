@@ -15,7 +15,7 @@ Classes
 Module Contents
 ---------------
 
-.. py:class:: AInCredentialType(type_id: str, required_fields: tuple[eu.algites.lib.security.credentials.core.ain_credential_field.AInCredentialField, Ellipsis], optional_fields: tuple[eu.algites.lib.security.credentials.core.ain_credential_field.AInCredentialField, Ellipsis])
+.. py:class:: AInCredentialType(type_id: str, property_name: str, required_fields: tuple[eu.algites.lib.security.credentials.core.ain_credential_field.AInCredentialField, Ellipsis], optional_fields: tuple[eu.algites.lib.security.credentials.core.ain_credential_field.AInCredentialField, Ellipsis])
 
    Bases: :py:obj:`enum.Enum`
 
@@ -36,6 +36,11 @@ Module Contents
 
 
    .. py:property:: id
+      :type: str
+
+
+
+   .. py:property:: property_name
       :type: str
 
 

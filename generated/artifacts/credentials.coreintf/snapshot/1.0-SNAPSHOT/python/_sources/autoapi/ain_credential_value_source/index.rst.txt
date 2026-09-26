@@ -24,22 +24,27 @@ Module Contents
 
 
    .. py:attribute:: DIRECT_VALUE
-      :value: 'DIRECT_VALUE'
+      :value: 'direct_value'
 
 
 
    .. py:attribute:: FILE_CONTENT
-      :value: 'FILE_CONTENT'
+      :value: 'file_content'
 
 
 
    .. py:attribute:: SECRET_CONTENT
-      :value: 'SECRET_CONTENT'
+      :value: 'secret_content'
 
 
 
    .. py:attribute:: ENVIRONMENT_VARIABLE_CONTENT
-      :value: 'ENVIRONMENT_VARIABLE_CONTENT'
+      :value: 'environment_variable_content'
+
+
+
+   .. py:property:: id
+      :type: str
 
 
 

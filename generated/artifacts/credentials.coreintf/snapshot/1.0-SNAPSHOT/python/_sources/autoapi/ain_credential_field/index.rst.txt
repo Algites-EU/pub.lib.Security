@@ -24,37 +24,37 @@ Module Contents
 
 
    .. py:attribute:: USERNAME
-      :value: 'username'
+      :value: 'Username'
 
 
 
    .. py:attribute:: PASSWORD
-      :value: 'password'
+      :value: 'Password'
 
 
 
    .. py:attribute:: TOKEN
-      :value: 'token'
+      :value: 'Token'
 
 
 
    .. py:attribute:: API_KEY
-      :value: 'apiKey'
+      :value: 'ApiKey'
 
 
 
    .. py:attribute:: CERTIFICATE
-      :value: 'certificate'
+      :value: 'Certificate'
 
 
 
    .. py:attribute:: PRIVATE_KEY
-      :value: 'privateKey'
+      :value: 'PrivateKey'
 
 
 
    .. py:attribute:: PRIVATE_KEY_PASSWORD
-      :value: 'privateKeyPassword'
+      :value: 'PrivateKeyPassword'
 
 
 

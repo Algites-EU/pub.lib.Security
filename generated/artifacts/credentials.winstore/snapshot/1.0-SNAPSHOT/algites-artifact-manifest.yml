@@ -1,21 +1,13 @@
-manifestVersion: 1
-artifact:
-  repositoryId: pub.lib.Security
-  localArtifactId: credentials.winstore
-  artifactCoordinateId: pub.lib.Security_credentials.winstore
-  version: 1.0-SNAPSHOT
-  sourcePath: credentials/winstore
-  structureKind: artifact
-  name: "Algites Windows credential store"
-  description: "Windows Credential Manager backend for Algites credentials."
-sourceMetadata:
-  descriptorHierarchy:
-    - structureKind: repository
-      path: algites-source-repository.yml
-      sha256: 21c7f5be947f8d0480826bb77a8a95d6dc52bee7de6a66e06af19ed4cf92777c
-    - structureKind: artifact-set
-      path: credentials/algites-artifact-set.yml
-      sha256: 1e7562530d658a8337886611814bc25178fcf5725305bd6b5f9d20e0195bbf43
-    - structureKind: artifact
-      path: credentials/winstore/algites-artifact.yml
-      sha256: 216be9d1281ec4e0bb6816525e5ef92f7aaf812d61a1657a73fa57319ea613ca
+ManifestVersion: 1
+Artifact:
+  RepositoryId: pub.lib.Security
+  LocalArtifactId: credentials.winstore
+  ArtifactCoordinateId: pub.lib.Security_credentials.winstore
+  GroupId: eu.algites.lib.security
+  Version: 1.0-SNAPSHOT
+  SourcePath: credentials/winstore
+  StructureKind: artifact
+  Name: "Algites Windows credential store"
+  Description: "Windows Credential Manager backend for Algites credentials."
+SourceMetadata:
+  DescriptorHierarchy:

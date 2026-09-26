@@ -1,21 +1,13 @@
-manifestVersion: 1
-artifact:
-  repositoryId: pub.lib.Security
-  localArtifactId: credentials.macstore
-  artifactCoordinateId: pub.lib.Security_credentials.macstore
-  version: 1.0-SNAPSHOT
-  sourcePath: credentials/macstore
-  structureKind: artifact
-  name: "Algites macOS credential store"
-  description: "macOS Keychain backend for Algites credentials."
-sourceMetadata:
-  descriptorHierarchy:
-    - structureKind: repository
-      path: algites-source-repository.yml
-      sha256: 21c7f5be947f8d0480826bb77a8a95d6dc52bee7de6a66e06af19ed4cf92777c
-    - structureKind: artifact-set
-      path: credentials/algites-artifact-set.yml
-      sha256: 1e7562530d658a8337886611814bc25178fcf5725305bd6b5f9d20e0195bbf43
-    - structureKind: artifact
-      path: credentials/macstore/algites-artifact.yml
-      sha256: 5a8df09b88d699aa423b23504164af20473f026a2b461551d8fcade0100e4e44
+ManifestVersion: 1
+Artifact:
+  RepositoryId: pub.lib.Security
+  LocalArtifactId: credentials.macstore
+  ArtifactCoordinateId: pub.lib.Security_credentials.macstore
+  GroupId: eu.algites.lib.security
+  Version: 1.0-SNAPSHOT
+  SourcePath: credentials/macstore
+  StructureKind: artifact
+  Name: "Algites macOS credential store"
+  Description: "macOS Keychain backend for Algites credentials."
+SourceMetadata:
+  DescriptorHierarchy:

@@ -1,21 +1,13 @@
-manifestVersion: 1
-artifact:
-  repositoryId: pub.lib.Security
-  localArtifactId: credentials.coreintf
-  artifactCoordinateId: pub.lib.Security_credentials.coreintf
-  version: 1.0-SNAPSHOT
-  sourcePath: credentials/coreintf
-  structureKind: artifact
-  name: "Algites credential core interfaces"
-  description: "Technology-neutral credential profile, value, provider, and secure-store contracts."
-sourceMetadata:
-  descriptorHierarchy:
-    - structureKind: repository
-      path: algites-source-repository.yml
-      sha256: 21c7f5be947f8d0480826bb77a8a95d6dc52bee7de6a66e06af19ed4cf92777c
-    - structureKind: artifact-set
-      path: credentials/algites-artifact-set.yml
-      sha256: 1e7562530d658a8337886611814bc25178fcf5725305bd6b5f9d20e0195bbf43
-    - structureKind: artifact
-      path: credentials/coreintf/algites-artifact.yml
-      sha256: c4891ce243efcbd5c10bef77b02f707ae54e48689f2cad8aa085941e0ee19ee1
+ManifestVersion: 1
+Artifact:
+  RepositoryId: pub.lib.Security
+  LocalArtifactId: credentials.coreintf
+  ArtifactCoordinateId: pub.lib.Security_credentials.coreintf
+  GroupId: eu.algites.lib.security
+  Version: 1.0-SNAPSHOT
+  SourcePath: credentials/coreintf
+  StructureKind: artifact
+  Name: "Algites credential core interfaces"
+  Description: "Technology-neutral credential profile, value, provider, and secure-store contracts."
+SourceMetadata:
+  DescriptorHierarchy:
