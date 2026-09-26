@@ -1,0 +1,26 @@
+package eu.algites.lib.security.credentials.core;
+
+import java.util.Optional;
+
+/**
+ * Persistent secure-store service provider interface.
+ *
+ * The store persists opaque Algites credential values under implementation-defined storage keys.
+ */
+public interface AIiCredentialStore {
+    String getId();
+
+    int getPriority();
+
+    AIcCredentialStoreAvailability getAvailability();
+
+    default boolean isAvailable() {
+        return getAvailability().isAvailable();
+    }
+
+    Optional<byte[]> read(String aStorageKey);
+
+    void write(String aStorageKey, byte[] aValue);
+
+    void delete(String aStorageKey);
+}
