@@ -22,6 +22,7 @@ import java.util.Optional;
  */
 public final class AIcCredentialService {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final AIcCredentialDocumentReader DOCUMENT_READER = new AIcCredentialDocumentReader();
 
     private final AIcCredentialStoreProvider storeProvider;
 
@@ -186,15 +187,23 @@ public final class AIcCredentialService {
     }
 
     private static ObjectNode parseCredentialDocumentObject(String aDocument) {
-        try {
-            JsonNode locNode = OBJECT_MAPPER.readTree(aDocument);
-            if (!(locNode instanceof ObjectNode locObject)) {
-                throw new AIxCredentialException("ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS must contain a JSON object.");
-            }
-            return locObject;
-        } catch (IOException aException) {
-            throw new AIxCredentialException("ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS does not contain valid JSON.", aException);
-        }
+        AIcCredentialDocument locDocument = DOCUMENT_READER.read(aDocument);
+        ObjectNode locRoot = OBJECT_MAPPER.createObjectNode();
+        locDocument.getProfiles().forEach((locProfileId, locTypes) -> {
+            ObjectNode locProfile = OBJECT_MAPPER.createObjectNode();
+            locTypes.forEach((locType, locFields) -> {
+                ObjectNode locTypedCredential = OBJECT_MAPPER.createObjectNode();
+                locFields.forEach((locField, locReference) -> {
+                    ObjectNode locFieldNode = OBJECT_MAPPER.createObjectNode();
+                    locFieldNode.put("Source", locReference.getSource().getId());
+                    locFieldNode.put("Value", locReference.getValue());
+                    locTypedCredential.set(locField.getId(), locFieldNode);
+                });
+                locProfile.set(locType.getPropertyName(), locTypedCredential);
+            });
+            locRoot.set(locProfileId, locProfile);
+        });
+        return locRoot;
     }
 
     private void writeCredentialDocumentObject(ObjectNode aRoot) {

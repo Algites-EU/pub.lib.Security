@@ -4,6 +4,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from eu.algites.lib.security.credentials.core.aic_credential import AIcCredential
+from eu.algites.lib.security.credentials.core.aic_credential_document_reader import AIcCredentialDocumentReader
 from eu.algites.lib.security.credentials.core.aic_credential_profile import AIcCredentialProfile
 from eu.algites.lib.security.credentials.core.aii_credential_provider import AIiCredentialProvider
 from eu.algites.lib.security.credentials.core.ain_credential_value_source import AInCredentialValueSource
@@ -51,23 +52,13 @@ class AIcCredentialDocumentProvider(AIiCredentialProvider):
     def _field_error(self, profile: AIcCredentialProfile, field, message: str) -> AIxCredentialException:
         return AIxCredentialException(f"Credential '{profile.id}/{profile.type.id}/{field.id}' {message}")
 
-    def _resolve_value(self, profile: AIcCredentialProfile, field, node: object, secrets: dict) -> str:
-        if not isinstance(node, dict):
-            raise self._field_error(profile, field, "must be an object containing Source and Value.")
-        source_value = node.get("Source")
-        reference = node.get("Value")
-        if not isinstance(source_value, str):
-            raise self._field_error(profile, field, "is missing string property 'Source'.")
-        if not isinstance(reference, str):
-            raise self._field_error(profile, field, "is missing string property 'Value'.")
-        try:
-            source = AInCredentialValueSource.from_id(source_value)
-        except ValueError as exception:
-            raise self._field_error(profile, field, str(exception)) from exception
+    def _resolve_reference(self, profile: AIcCredentialProfile, field, reference, secrets: dict) -> str:
+        source = reference.source
+        value = reference.value
         if source is AInCredentialValueSource.DIRECT_VALUE:
-            return reference
+            return value
         if source is AInCredentialValueSource.FILE_CONTENT:
-            path = Path(reference)
+            path = Path(value)
             if not path.is_absolute():
                 path = self._base_directory / path
             path = path.resolve()
@@ -75,46 +66,40 @@ class AIcCredentialDocumentProvider(AIiCredentialProvider):
                 raise self._field_error(profile, field, f"references missing file '{path}'.")
             return path.read_text(encoding="utf-8")
         if source is AInCredentialValueSource.SECRET_CONTENT:
-            if reference in secrets:
-                return str(secrets[reference])
-            stored = self._store_provider.read_named_secret(reference)
+            if value in secrets:
+                return str(secrets[value])
+            stored = self._store_provider.read_named_secret(value)
             if stored is None:
-                raise self._field_error(profile, field, f"references unavailable secret '{reference}'.")
+                raise self._field_error(profile, field, f"references unavailable secret '{value}'.")
             return stored.decode("utf-8")
         if source is AInCredentialValueSource.ENVIRONMENT_VARIABLE_CONTENT:
-            if reference not in self._environment:
-                raise self._field_error(profile, field, f"references unavailable environment variable '{reference}'.")
-            return self._environment[reference]
-        raise self._field_error(profile, field, f"uses unsupported source '{source_value}'.")
+            if value not in self._environment:
+                raise self._field_error(profile, field, f"references unavailable environment variable '{value}'.")
+            return self._environment[value]
+        raise self._field_error(profile, field, f"uses unsupported source '{source.id}'.")
+
+    def resolve_field(self, document, profile: AIcCredentialProfile, field):
+        typed = document.get_credential_values(profile.id, profile.type)
+        if typed is None or field not in typed:
+            return None
+        if field not in profile.type.supported_fields:
+            raise AIxCredentialException(
+                f"Credential field '{field.id}' is not supported by credential type '{profile.type.id}'."
+            )
+        return self._resolve_reference(profile, field, typed[field], self._secret_context())
 
     def resolve(self, profile: AIcCredentialProfile) -> AIcCredential | None:
         raw = self._load_document()
         if not raw or not raw.strip():
             return None
-        root = self._parse_object(raw, self.CREDENTIALS_VARIABLE)
-        profile_node = root.get(profile.id)
-        if profile_node is None:
-            return None
-        if not isinstance(profile_node, dict):
-            raise AIxCredentialException(f"Credential profile '{profile.id}' must be a JSON object.")
-        typed = profile_node.get(profile.type.property_name)
+        document = AIcCredentialDocumentReader().read(raw)
+        typed = document.get_credential_values(profile.id, profile.type)
         if typed is None:
             return None
-        if not isinstance(typed, dict):
-            raise AIxCredentialException(
-                f"Credential profile '{profile.id}' type '{profile.type.id}' must be a JSON object."
-            )
         secrets = self._secret_context()
         values = {}
-        for field in profile.type.supported_fields:
-            node = typed.get(field.id)
-            if node is None:
-                if field in profile.type.required_fields:
-                    raise AIxCredentialException(
-                        f"Credential profile '{profile.id}' type '{profile.type.id}' is missing required field '{field.id}'."
-                    )
-                continue
-            values[field] = self._resolve_value(profile, field, node, secrets)
+        for field, reference in typed.items():
+            values[field] = self._resolve_reference(profile, field, reference, secrets)
         credential = AIcCredential(values)
         if not credential.satisfies(profile):
             credential.close()

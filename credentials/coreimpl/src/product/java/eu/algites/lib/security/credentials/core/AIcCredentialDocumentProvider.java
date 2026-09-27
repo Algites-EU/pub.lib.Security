@@ -27,6 +27,7 @@ public final class AIcCredentialDocumentProvider implements AIiCredentialProvide
     public static final String SECRET_CONTEXT_VARIABLE = "_TMP_ALGITES_CREDENTIAL_SECRETS_JSON";
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final AIcCredentialDocumentReader DOCUMENT_READER = new AIcCredentialDocumentReader();
 
     private final Map<String, String> environment;
     private final Path baseDirectory;
@@ -36,7 +37,7 @@ public final class AIcCredentialDocumentProvider implements AIiCredentialProvide
         this(System.getenv(), Path.of(System.getProperty("user.dir")), new AIcCredentialStoreProvider());
     }
 
-    AIcCredentialDocumentProvider(Map<String, String> aEnvironment, Path aBaseDirectory) {
+    public AIcCredentialDocumentProvider(Map<String, String> aEnvironment, Path aBaseDirectory) {
         this(aEnvironment, aBaseDirectory, new AIcCredentialStoreProvider());
     }
 
@@ -58,40 +59,27 @@ public final class AIcCredentialDocumentProvider implements AIiCredentialProvide
             return Optional.empty();
         }
 
-        JsonNode locRoot = parseObject(locDocument, CREDENTIALS_VARIABLE);
-        JsonNode locProfile = locRoot.get(aProfile.getId());
-        if (locProfile == null || locProfile.isNull()) {
-            return Optional.empty();
-        }
-        if (!locProfile.isObject()) {
-            throw new AIxCredentialException("Credential profile '" + aProfile.getId() + "' must be a JSON object.");
-        }
+        AIcCredentialDocument locParsedDocument = DOCUMENT_READER.read(locDocument);
+        return resolve(locParsedDocument, aProfile);
+    }
 
-        JsonNode locTypedCredential = locProfile.get(aProfile.getType().getPropertyName());
-        if (locTypedCredential == null || locTypedCredential.isNull()) {
+    public Optional<AIcCredential> resolve(AIcCredentialDocument aDocument, AIcCredentialProfile aProfile) {
+        Objects.requireNonNull(aDocument, "Credential document must not be null.");
+        Objects.requireNonNull(aProfile, "Credential profile must not be null.");
+        Optional<Map<AInCredentialField, AIcCredentialValueReference>> locTypedCredential =
+            aDocument.getCredentialValues(aProfile.getId(), aProfile.getType());
+        if (locTypedCredential.isEmpty()) {
             return Optional.empty();
-        }
-        if (!locTypedCredential.isObject()) {
-            throw new AIxCredentialException(
-                "Credential profile '" + aProfile.getId() + "' type '" + aProfile.getType().getId() + "' must be a JSON object."
-            );
         }
 
         JsonNode locSecrets = parseOptionalSecretContext();
         EnumMap<AInCredentialField, char[]> locValues = new EnumMap<>(AInCredentialField.class);
         try {
-            for (AInCredentialField locField : aProfile.getType().getSupportedFields()) {
-                JsonNode locFieldNode = locTypedCredential.get(locField.getId());
-                if (locFieldNode == null || locFieldNode.isNull()) {
-                    if (aProfile.getType().getRequiredFields().contains(locField)) {
-                        throw new AIxCredentialException(
-                            "Credential profile '" + aProfile.getId() + "' type '" + aProfile.getType().getId() +
-                                "' is missing required field '" + locField.getId() + "'."
-                        );
-                    }
-                    continue;
-                }
-                locValues.put(locField, resolveValue(aProfile, locField, locFieldNode, locSecrets));
+            for (Map.Entry<AInCredentialField, AIcCredentialValueReference> locEntry : locTypedCredential.get().entrySet()) {
+                locValues.put(
+                    locEntry.getKey(),
+                    resolveValue(aProfile, locEntry.getKey(), locEntry.getValue(), locSecrets)
+                );
             }
 
             AIcCredential locCredential = new AIcCredential(locValues);
@@ -105,6 +93,32 @@ public final class AIcCredentialDocumentProvider implements AIiCredentialProvide
         } finally {
             locValues.values().forEach(locValue -> Arrays.fill(locValue, '\0'));
         }
+    }
+
+    public Optional<char[]> resolveField(
+        AIcCredentialDocument aDocument,
+        AIcCredentialProfile aProfile,
+        AInCredentialField aField
+    ) {
+        Objects.requireNonNull(aDocument, "Credential document must not be null.");
+        Objects.requireNonNull(aProfile, "Credential profile must not be null.");
+        Objects.requireNonNull(aField, "Credential field must not be null.");
+        if (!aProfile.getType().getSupportedFields().contains(aField)) {
+            throw new AIxCredentialException(
+                "Credential field '" + aField.getId() + "' is not supported by credential type '" +
+                    aProfile.getType().getId() + "'."
+            );
+        }
+        Optional<Map<AInCredentialField, AIcCredentialValueReference>> locTypedCredential =
+            aDocument.getCredentialValues(aProfile.getId(), aProfile.getType());
+        if (locTypedCredential.isEmpty()) {
+            return Optional.empty();
+        }
+        AIcCredentialValueReference locReference = locTypedCredential.get().get(aField);
+        if (locReference == null) {
+            return Optional.empty();
+        }
+        return Optional.of(resolveValue(aProfile, aField, locReference, parseOptionalSecretContext()));
     }
 
 
@@ -129,28 +143,11 @@ public final class AIcCredentialDocumentProvider implements AIiCredentialProvide
     private char[] resolveValue(
         AIcCredentialProfile aProfile,
         AInCredentialField aField,
-        JsonNode aFieldNode,
+        AIcCredentialValueReference aReference,
         JsonNode aSecrets
     ) {
-        if (!aFieldNode.isObject()) {
-            throw fieldError(aProfile, aField, "must be an object containing Source and Value.");
-        }
-        JsonNode locSourceNode = aFieldNode.get("Source");
-        JsonNode locValueNode = aFieldNode.get("Value");
-        if (locSourceNode == null || !locSourceNode.isTextual()) {
-            throw fieldError(aProfile, aField, "is missing string property 'Source'.");
-        }
-        if (locValueNode == null || !locValueNode.isTextual()) {
-            throw fieldError(aProfile, aField, "is missing string property 'Value'.");
-        }
-
-        AInCredentialValueSource locSource;
-        try {
-            locSource = AInCredentialValueSource.fromId(locSourceNode.textValue());
-        } catch (IllegalArgumentException aException) {
-            throw fieldError(aProfile, aField, aException.getMessage());
-        }
-        String locValue = locValueNode.textValue();
+        AInCredentialValueSource locSource = aReference.getSource();
+        String locValue = aReference.getValue();
 
         return switch (locSource) {
             case DIRECT_VALUE -> locValue.toCharArray();

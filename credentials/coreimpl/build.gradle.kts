@@ -22,6 +22,7 @@ java {
 dependencies {
     api(project(":credentials:coreintf"))
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.2")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2")
 
     runtimeOnly(project(":credentials:winstore"))
     runtimeOnly(project(":credentials:macstore"))

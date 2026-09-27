@@ -1,7 +1,9 @@
 import json
 
 from eu.algites.lib.security.credentials.core.aic_credential import AIcCredential
+from eu.algites.lib.security.credentials.core.aic_credential_document_reader import AIcCredentialDocumentReader
 from eu.algites.lib.security.credentials.core.aic_credential_profile import AIcCredentialProfile
+from eu.algites.lib.security.credentials.core.ain_credential_type import AInCredentialType
 from eu.algites.lib.security.credentials.core.ain_credential_value_source import AInCredentialValueSource
 from eu.algites.lib.security.credentials.core.aix_credential_exception import AIxCredentialException
 from eu.algites.lib.security.credentials.core.aic_credential_store_provider import AIcCredentialStoreProvider
@@ -71,13 +73,20 @@ class AIcCredentialService:
         return None if value is None else value.decode("utf-8")
 
     def store_credential_document(self, document: str) -> None:
-        try:
-            parsed = json.loads(document)
-        except json.JSONDecodeError as exception:
-            raise AIxCredentialException("ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS does not contain valid JSON.") from exception
-        if not isinstance(parsed, dict):
-            raise AIxCredentialException("ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS must contain a JSON object.")
-        self._write_document_object(parsed)
+        parsed = AIcCredentialDocumentReader().read(document)
+        normalized: dict = {}
+        for profile_id in parsed.profile_ids:
+            profile_node = {}
+            for credential_type in AInCredentialType:
+                values = parsed.get_credential_values(profile_id, credential_type)
+                if values is None:
+                    continue
+                typed = {}
+                for field, reference in values.items():
+                    typed[field.id] = {"Source": reference.source.id, "Value": reference.value}
+                profile_node[credential_type.property_name] = typed
+            normalized[profile_id] = profile_node
+        self._write_document_object(normalized)
 
     def remove_credential_document(self) -> None:
         self._store_provider.delete_credential_document()

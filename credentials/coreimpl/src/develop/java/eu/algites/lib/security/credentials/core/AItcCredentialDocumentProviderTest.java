@@ -109,6 +109,48 @@ public final class AItcCredentialDocumentProviderTest {
         }
     }
 
+    @Test
+    public void testResolvesYamlCredentialDocument() {
+        AIcCredentialDocumentProvider locProvider = new AIcCredentialDocumentProvider(
+            Map.of(
+                "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS",
+                "profile:\n" +
+                    "  Basic:\n" +
+                    "    Username:\n" +
+                    "      Source: direct_value\n" +
+                    "      Value: user\n" +
+                    "    Password:\n" +
+                    "      Source: direct_value\n" +
+                    "      Value: password\n"
+            ),
+            Path.of(".")
+        );
+
+        AIcCredentialProfile locProfile = new AIcCredentialProfile("profile", AInCredentialType.BASIC);
+        try (AIcCredential locCredential = locProvider.resolve(locProfile).orElseThrow()) {
+            Assert.assertEquals(new String(locCredential.getValue(AInCredentialField.USERNAME).orElseThrow()), "user");
+            Assert.assertEquals(new String(locCredential.getValue(AInCredentialField.PASSWORD).orElseThrow()), "password");
+        }
+    }
+
+    @Test
+    public void testResolvesXmlCredentialDocument() {
+        AIcCredentialDocumentProvider locProvider = new AIcCredentialDocumentProvider(
+            Map.of(
+                "ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS",
+                "<CredentialDocument><Profile Id=\"profile\"><Bearer><Token>" +
+                    "<Source>direct_value</Source><Value>token</Value>" +
+                    "</Token></Bearer></Profile></CredentialDocument>"
+            ),
+            Path.of(".")
+        );
+
+        AIcCredentialProfile locProfile = new AIcCredentialProfile("profile", AInCredentialType.BEARER);
+        try (AIcCredential locCredential = locProvider.resolve(locProfile).orElseThrow()) {
+            Assert.assertEquals(new String(locCredential.getValue(AInCredentialField.TOKEN).orElseThrow()), "token");
+        }
+    }
+
     private static final class AIcTestCredentialStore implements AIiCredentialStore {
         private final Map<String, byte[]> values = new HashMap<>();
 
