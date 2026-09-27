@@ -6,10 +6,5 @@ This page contains auto-generated API reference documentation [#f1]_.
 .. toctree::
    :titlesonly:
 
-   /autoapi/aic_credential_service/index
-   /autoapi/aic_credential_resolver/index
-   /autoapi/aic_credential_store_provider/index
-   /autoapi/aic_credential_document_provider/index
-   /autoapi/aic_environment_credential_provider/index
 
 .. [#f1] Created with `sphinx-autoapi <https://github.com/readthedocs/sphinx-autoapi>`_
