@@ -1,0 +1,13 @@
+ManifestVersion: 1
+Artifact:
+  RepositoryId: pub.lib.Security
+  LocalArtifactId: credentials.coreintf
+  ArtifactCoordinateId: pub.lib.Security_credentials.coreintf
+  GroupId: eu.algites.lib.security
+  Version: ""
+  SourcePath: credentials/coreintf
+  StructureKind: artifact
+  Name: "Algites credential core interfaces"
+  Description: "Technology-neutral credential profile, value, provider, and secure-store contracts."
+SourceMetadata:
+  DescriptorHierarchy:
