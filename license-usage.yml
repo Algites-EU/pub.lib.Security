@@ -1,9 +1,13 @@
-licenses:
-  - id: Apache-2.0
-    enabled: true
-    contentKinds:
+# yaml-language-server: $schema=https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/algites-license-usage_1.yamldef.schema.json
+# $schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/algites-license-usage_1.yamldef.schema.json
+$schema: https://defs.dev.algites.eu/api/yamldefs/eu/algites/tool/build/yamldefs/algites-license-usage_1.yamldef.schema.json
+
+Licenses:
+  - Id: Apache-2.0
+    Enabled: true
+    ContentKinds:
       - product
-  - id: CC-BY-4.0
-    enabled: true
-    contentKinds:
+  - Id: CC-BY-4.0
+    Enabled: true
+    ContentKinds:
       - documentation
