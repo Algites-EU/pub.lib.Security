@@ -5,6 +5,6 @@ SourceRepository:
 GroupId: eu.algites.lib.security
 
 Version:
-  ReleaseLine: "1"
+  ReleaseLineVersion: "1"
   Revision: 0
   QualifierKind: snapshot
