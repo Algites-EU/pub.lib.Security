@@ -1,4 +1,22 @@
 package eu.algites.lib.security.credentials.core;
+import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+import eu.algites.lib.security.credentials.core.AIigCredentials_1;
+
+import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+import eu.algites.lib.security.credentials.core.AIigCredentials_1;
+
+import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+import eu.algites.lib.security.credentials.core.AIigCredentials_1;
+
+import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+import eu.algites.lib.security.credentials.core.AIigCredentials_1;
+
+import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+import eu.algites.lib.security.credentials.core.AIigCredentials_1;
+
+import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+import eu.algites.lib.security.credentials.core.AIigCredentials_1;
+
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -167,7 +185,7 @@ public final class AIcCredentialDocumentReader {
             Map.Entry<String, JsonNode> locProfileEntry = locProfileIterator.next();
             String locProfileId = locProfileEntry.getKey();
             JsonNode locProfileNode = locProfileEntry.getValue();
-            if ("$schema".equals(locProfileId)) {
+            if (AIigCredentials_1.SCHEMA_FIELD_NAME__SCHEMA.equals(locProfileId)) {
                 if (!locProfileNode.isTextual()) {
                     throw new AIxCredentialException("Credential document '$schema' must be a string.");
                 }
@@ -237,8 +255,8 @@ public final class AIcCredentialDocumentReader {
         if (!aNode.isObject()) {
             throw fieldError(aProfileId, aType, aField, "must be an object containing Source and Value.");
         }
-        JsonNode locSourceNode = aNode.get("Source");
-        JsonNode locValueNode = aNode.get("Value");
+        JsonNode locSourceNode = aNode.get(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE);
+        JsonNode locValueNode = aNode.get(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE);
         if (locSourceNode == null || !locSourceNode.isTextual()) {
             throw fieldError(aProfileId, aType, aField, "is missing string property 'Source'.");
         }
@@ -308,8 +326,8 @@ public final class AIcCredentialDocumentReader {
                                     "' does not support field '" + locField.getId() + "'."
                             );
                         }
-                        String locSource = requiredChildText(locFieldElement, "Source", locProfileId, locType, locField);
-                        String locValue = requiredChildText(locFieldElement, "Value", locProfileId, locType, locField);
+                        String locSource = requiredChildText(locFieldElement, AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE, locProfileId, locType, locField);
+                        String locValue = requiredChildText(locFieldElement, AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE, locProfileId, locType, locField);
                         if (childElements(locFieldElement).size() != 2) {
                             throw fieldError(locProfileId, locType, locField, "contains unsupported XML elements.");
                         }

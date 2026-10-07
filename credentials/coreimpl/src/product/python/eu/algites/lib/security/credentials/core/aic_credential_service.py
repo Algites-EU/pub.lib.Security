@@ -1,5 +1,7 @@
 import json
 
+from eu.algites.lib.security.credentials.core.aiig_credential_value_source_fields_1 import AIigCredentialValueSourceFields_1
+
 from eu.algites.lib.security.credentials.core.aic_credential import AIcCredential
 from eu.algites.lib.security.credentials.core.aic_credential_document_reader import AIcCredentialDocumentReader
 from eu.algites.lib.security.credentials.core.aic_credential_profile import AIcCredentialProfile
@@ -51,7 +53,7 @@ class AIcCredentialService:
         for field in profile.type.supported_fields:
             value = credential.get_text(field)
             if value is not None:
-                typed[field.id] = {"Source": AInCredentialValueSource.DIRECT_VALUE.id, "Value": value}
+                typed[field.id] = {AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE: AInCredentialValueSource.DIRECT_VALUE.id, AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE: value}
         profile_node[profile.type.property_name] = typed
         self._write_document_object(root)
 
@@ -83,7 +85,7 @@ class AIcCredentialService:
                     continue
                 typed = {}
                 for field, reference in values.items():
-                    typed[field.id] = {"Source": reference.source.id, "Value": reference.value}
+                    typed[field.id] = {AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE: reference.source.id, AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE: reference.value}
                 profile_node[credential_type.property_name] = typed
             normalized[profile_id] = profile_node
         self._write_document_object(normalized)

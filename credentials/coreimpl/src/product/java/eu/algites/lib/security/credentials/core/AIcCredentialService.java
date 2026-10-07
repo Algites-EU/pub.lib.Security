@@ -1,4 +1,16 @@
 package eu.algites.lib.security.credentials.core;
+import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+
+import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+
+import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+
+import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+
+import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+
+import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -73,8 +85,8 @@ public final class AIcCredentialService {
             char[] locChars = locValue.get();
             try {
                 ObjectNode locFieldNode = OBJECT_MAPPER.createObjectNode();
-                locFieldNode.put("Source", AInCredentialValueSource.DIRECT_VALUE.getId());
-                locFieldNode.put("Value", new String(locChars));
+                locFieldNode.put(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE, AInCredentialValueSource.DIRECT_VALUE.getId());
+                locFieldNode.put(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE, new String(locChars));
                 locTypedCredential.set(locField.getId(), locFieldNode);
             } finally {
                 Arrays.fill(locChars, '\0');
@@ -195,8 +207,8 @@ public final class AIcCredentialService {
                 ObjectNode locTypedCredential = OBJECT_MAPPER.createObjectNode();
                 locFields.forEach((locField, locReference) -> {
                     ObjectNode locFieldNode = OBJECT_MAPPER.createObjectNode();
-                    locFieldNode.put("Source", locReference.getSource().getId());
-                    locFieldNode.put("Value", locReference.getValue());
+                    locFieldNode.put(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE, locReference.getSource().getId());
+                    locFieldNode.put(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE, locReference.getValue());
                     locTypedCredential.set(locField.getId(), locFieldNode);
                 });
                 locProfile.set(locType.getPropertyName(), locTypedCredential);

@@ -147,3 +147,24 @@ See:
 ---
 
 **© Algites**
+
+
+### Generated schema contracts
+
+Schema-owned `SCHEMA_FIELD_NAME__*` constants are declared on generated interface
+contracts in the same package path as the canonical schema. Contracts and enums
+are generated in `coreintf`; concrete dataclasses/records are generated in
+`coreimpl`. Generated `.gen` and `.extgen` trees are ignored by Git and must never
+be copied from another checkout or included in repository source archives.
+
+```bash
+./gradlew generateModustroSchemaBindings
+./gradlew testModustroSchemaBindings
+```
+
+Build preparation and tests depend on generation. The JVM implementation of the
+shared **pub.tool.General Defs Codegen** generator renders both Python and Java;
+its updated version must be published before consuming these repositories.
+See [the generated-source conventions](specs/GENERATED-SOURCES.md) for the
+artifact split, cleanup of formerly tracked outputs, and CI verification.
+

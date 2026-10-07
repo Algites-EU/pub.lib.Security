@@ -1,0 +1,16 @@
+{
+  "artifact": "credentials/coreintf",
+  "languages": [
+    "python",
+    "java"
+  ],
+  "bindings": [
+    {
+      "schema": "credentials/coreintf/src/product/jsondefs/eu/algites/lib/security/credentials/core/credentials_1.jsondef.schema.json",
+      "pointer": "/$defs/valueSource",
+      "name": "credential-value-source-fields",
+      "common_one_of_fields": true
+    }
+  ],
+  "implementation_artifact": "credentials/coreimpl"
+}

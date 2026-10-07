@@ -1,5 +1,13 @@
 from __future__ import annotations
 
+from eu.algites.lib.security.credentials.core.aiig_credential_value_source_fields_1 import AIigCredentialValueSourceFields_1
+from eu.algites.lib.security.credentials.core.aiig_credentials_1 import AIigCredentials_1
+
+
+
+
+
+
 import io
 import json
 from collections.abc import Mapping
@@ -120,7 +128,7 @@ class AIcCredentialDocumentReader:
             raise AIxCredentialException(f"Credential document must contain a {format_name} object at its root.")
         profiles: dict[str, dict[AInCredentialType, dict[AInCredentialField, AIcCredentialValueReference]]] = {}
         for profile_id, profile_node in root.items():
-            if profile_id == "$schema":
+            if profile_id == AIigCredentials_1.SCHEMA_FIELD_NAME__SCHEMA:
                 if not isinstance(profile_node, str):
                     raise AIxCredentialException("Credential document '$schema' must be a string.")
                 continue
@@ -164,10 +172,10 @@ class AIcCredentialDocumentReader:
     ) -> AIcCredentialValueReference:
         if not isinstance(node, Mapping):
             raise self._field_error(profile_id, credential_type, field, "must be an object containing Source and Value.")
-        if set(node.keys()) != {"Source", "Value"}:
+        if set(node.keys()) != {AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE, AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE}:
             raise self._field_error(profile_id, credential_type, field, "must contain exactly Source and Value.")
-        source_value = node.get("Source")
-        reference = node.get("Value")
+        source_value = node.get(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE)
+        reference = node.get(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE)
         if not isinstance(source_value, str):
             raise self._field_error(profile_id, credential_type, field, "is missing string property 'Source'.")
         if not isinstance(reference, str):
@@ -211,7 +219,7 @@ class AIcCredentialDocumentReader:
                             f"'{field.id}'."
                         )
                     children = list(field_element)
-                    if [child.tag for child in children] != ["Source", "Value"]:
+                    if [child.tag for child in children] != [AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE, AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE]:
                         raise self._field_error(
                             profile_id,
                             credential_type,
