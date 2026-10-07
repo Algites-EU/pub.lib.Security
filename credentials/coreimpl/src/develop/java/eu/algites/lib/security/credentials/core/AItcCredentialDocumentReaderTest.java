@@ -71,6 +71,21 @@ public final class AItcCredentialDocumentReaderTest {
         assertBasic(locReader.readXml(XML_DOCUMENT));
     }
 
+    @Test
+    public void testRootSchemaHintIsNotACredentialProfile() {
+        AIcCredentialDocumentReader locReader = new AIcCredentialDocumentReader();
+        String locSchemaUri = "https://defs.dev.algites.eu/api/yamldefs/eu/algites/lib/security/credentials/core/credentials_1.yamldef.schema.json";
+        AIcCredentialDocument locJsonDocument = locReader.readJson(
+            "{\"$schema\":\"" + locSchemaUri + "\"," + JSON_DOCUMENT.substring(1));
+        AIcCredentialDocument locYamlDocument = locReader.readYaml("$schema: " + locSchemaUri + "\n" + YAML_DOCUMENT);
+        assertBasic(locJsonDocument);
+        assertBasic(locYamlDocument);
+        Assert.assertFalse(locJsonDocument.containsProfile("$schema"));
+        Assert.assertFalse(locYamlDocument.containsProfile("$schema"));
+        Assert.expectThrows(AIxCredentialException.class, () -> locReader.readJson("{\"$schema\":4}"));
+        Assert.expectThrows(AIxCredentialException.class, () -> locReader.readYaml("$schema: 4\n"));
+    }
+
     private static void assertBasic(AIcCredentialDocument aDocument) {
         var locValues = aDocument.getCredentialValues("profile", AInCredentialType.BASIC).orElseThrow();
         Assert.assertEquals(locValues.get(AInCredentialField.USERNAME).getSource(), AInCredentialValueSource.DIRECT_VALUE);

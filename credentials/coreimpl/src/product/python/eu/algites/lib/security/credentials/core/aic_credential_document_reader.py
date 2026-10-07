@@ -120,6 +120,10 @@ class AIcCredentialDocumentReader:
             raise AIxCredentialException(f"Credential document must contain a {format_name} object at its root.")
         profiles: dict[str, dict[AInCredentialType, dict[AInCredentialField, AIcCredentialValueReference]]] = {}
         for profile_id, profile_node in root.items():
+            if profile_id == "$schema":
+                if not isinstance(profile_node, str):
+                    raise AIxCredentialException("Credential document '$schema' must be a string.")
+                continue
             if not isinstance(profile_id, str) or not isinstance(profile_node, Mapping):
                 raise AIxCredentialException("Credential profiles must use string ids and object values.")
             typed_credentials: dict[AInCredentialType, dict[AInCredentialField, AIcCredentialValueReference]] = {}

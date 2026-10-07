@@ -25,7 +25,7 @@ The repository is organized into security domains. Each domain may contain sever
 ├── README.md
 └── credentials/
     ├── README.md
-    ├── algites-artifact-set.yml
+    ├── modustro-artifact-set.yml
     ├── coreintf/
     │   └── src/
     │       ├── product/

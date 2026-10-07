@@ -167,6 +167,12 @@ public final class AIcCredentialDocumentReader {
             Map.Entry<String, JsonNode> locProfileEntry = locProfileIterator.next();
             String locProfileId = locProfileEntry.getKey();
             JsonNode locProfileNode = locProfileEntry.getValue();
+            if ("$schema".equals(locProfileId)) {
+                if (!locProfileNode.isTextual()) {
+                    throw new AIxCredentialException("Credential document '$schema' must be a string.");
+                }
+                continue;
+            }
             if (!locProfileNode.isObject()) {
                 throw new AIxCredentialException("Credential profile '" + locProfileId + "' must be an object.");
             }

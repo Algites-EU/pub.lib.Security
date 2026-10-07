@@ -1,9 +1,12 @@
 import io
+import json
+import pytest
 
 from eu.algites.lib.security.credentials.core.aic_credential_document_reader import AIcCredentialDocumentReader
 from eu.algites.lib.security.credentials.core.ain_credential_field import AInCredentialField
 from eu.algites.lib.security.credentials.core.ain_credential_type import AInCredentialType
 from eu.algites.lib.security.credentials.core.ain_credential_value_source import AInCredentialValueSource
+from eu.algites.lib.security.credentials.core.aix_credential_exception import AIxCredentialException
 
 
 JSON_DOCUMENT = '''{
@@ -44,6 +47,21 @@ def _assert_basic(document):
     assert values[AInCredentialField.USERNAME].source is AInCredentialValueSource.DIRECT_VALUE
     assert values[AInCredentialField.USERNAME].value == "user"
     assert values[AInCredentialField.PASSWORD].value == "password"
+
+
+def test_root_schema_hint_is_not_a_credential_profile():
+    reader = AIcCredentialDocumentReader()
+    schema_uri = "https://defs.dev.algites.eu/api/yamldefs/eu/algites/lib/security/credentials/core/credentials_1.yamldef.schema.json"
+    json_document = reader.read_json(json.dumps({"$schema": schema_uri, **json.loads(JSON_DOCUMENT)}))
+    yaml_document = reader.read_yaml("$schema: " + schema_uri + "\n" + YAML_DOCUMENT)
+    _assert_basic(json_document)
+    _assert_basic(yaml_document)
+    assert not json_document.contains_profile("$schema")
+    assert not yaml_document.contains_profile("$schema")
+    with pytest.raises(AIxCredentialException):
+        reader.read_json('{"$schema":4}')
+    with pytest.raises(AIxCredentialException):
+        reader.read_yaml("$schema: 4\n")
 
 
 def test_detects_json_yaml_and_xml():
