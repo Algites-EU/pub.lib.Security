@@ -1,0 +1,12 @@
+ManifestVersion: 1
+Artifact:
+  RepositoryId: pub.lib.Security
+  LocalArtifactId: ""
+  ArtifactCoordinateId: pub.lib.Security_
+  Version: ""
+  SourcePath: ""
+  StructureKind: ""
+  Name: ""
+  Description: ""
+SourceMetadata:
+  DescriptorHierarchy:
