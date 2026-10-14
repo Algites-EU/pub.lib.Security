@@ -11,3 +11,6 @@ docs-site/
 # Build outputs (u vás do run/)
 run/*
 **/run/*
+# Generator-owned source trees are recreated before builds and tests.
+**/*.gen/
+**/*.extgen/
