@@ -4,7 +4,7 @@ val locSchemaGeneratorLoaders = rootProject.subprojects.mapNotNull {
     it.tasks.findByName("generateModustroDefinitionSources")?.javaClass?.classLoader
 } + listOf(rootProject.buildscript.classLoader)
 val locSchemaGeneratorClasses = listOf(
-    "eu.algites.tool.codegen.defs.AIcDefaultDefsCodegenService",
+    "eu.algites.tool.codegen.defs.impl.standard.AIcDefaultDefsCodegenService",
     "eu.algites.tool.codegen.defs.AIcdCodeGenerationRequest",
     "eu.algites.lib.naming.convention.AIcAlgitesNamingProfiles",
     "eu.algites.lib.naming.convention.AIcdNamingProfile",
