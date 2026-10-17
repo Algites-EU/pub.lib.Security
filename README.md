@@ -87,8 +87,8 @@ Consumers should depend only on the security domain and artifacts required by th
 
 The `credentials` module set provides the common credential model, resolution implementation, and optional operating-system secure-store backends.
 
-- `credentials/coreintf` — Java + Python credential profile, value, provider, and store contracts together with shared JSON definitions.
-- `credentials/coreimpl` — Java + Python credential document, environment, resolver, codec, and secure-store selection implementation.
+- `credentials/core/intf` — Java + Python credential profile, value, provider, and store contracts together with shared JSON definitions.
+- `credentials/core/impl` — Java + Python credential document, environment, resolver, codec, and secure-store selection implementation.
 - `credentials/winstore` — Java Windows Credential Manager backend.
 - `credentials/macstore` — Java macOS Keychain backend.
 - `credentials/secretservicestore` — Java Freedesktop Secret Service backend.
@@ -98,7 +98,7 @@ The core artifacts deliberately share the same business namespace even though th
 The canonical credential JSON definitions are located under:
 
 ```text
-credentials/coreintf/src/product/jsondefs/eu/algites/lib/security/credentials/core/
+credentials/core/intf/src/product/jsondefs/eu/algites/lib/security/credentials/core/
 ```
 
 Build tools, CLI tools, AAC applications, catalog services, and other products may therefore use the same credential model without making the credential subsystem build-specific.
