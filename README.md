@@ -70,6 +70,53 @@ Gradle coordinates all TechnologyKinds, shared definitions, validation, testing,
 
 ---
 
+### Standalone Security bootstrap (1.1)
+
+Security products built with the current generators use the **1.1** release line
+(`1.1-SNAPSHOT` for Java and unique `1.1.dev…` snapshot versions for Python).
+The previously published **1.0** line is intentionally retained for consumers
+built with the old generators; it is not replaced by this bootstrap.
+
+A standalone, descriptor-driven bootstrap is available without loading the
+unfinished Modustro Builder or remote Gradle settings plugin:
+
+```bash
+MODUSTRO_BOOTSTRAP_DEPENDENCY_MODE=local bash devops/bootstrap.sh --plan-only
+MODUSTRO_BOOTSTRAP_DEPENDENCY_MODE=local bash devops/bootstrap.sh --prepare-only
+# Only when ready to publish the verified artifacts to Cloudsmith:
+MODUSTRO_BOOTSTRAP_DEPENDENCY_MODE=remote bash devops/bootstrap.sh --upload
+```
+
+`--prepare-only` runs tests, builds and verifies the Maven publications, promotes
+them to `~/.modustro/artifact-repos/java/maven`, builds and checks declared
+Python wheels/sdists, and publishes those distributions to the local Python
+Simple index under `~/.modustro/artifact-repos/python`. It does not upload to
+Cloudsmith. The result manifests are stored in `build/run/security-bootstrap`.
+The explicit modes `remote`, `local` and `source` control dependency sources,
+not the publication destination. Both `MODUSTRO_HOME` and
+`MODUSTRO_LOCAL_MAVEN_REPOSITORY` can change the local repository location.
+
+`--plan-only` and both publication manifests derive their counts directly from
+`modustro-artifact.yml` declarations. Unspecified Java/Python products are **not**
+implicitly enabled. The locally staged JARs, POMs, Gradle metadata and source
+JARs are verified before promotion. Full integration tests require Gradle 9.2.1
+and the required upstream dependency artifacts.
+
+**Generation migration prerequisite:** this standalone transitional bootstrap
+packages the `src/product/*.gen` trees present in the checkout; it does not yet
+regenerate them using the new Defs/SDO 1.1 CLI. The former
+`AIcSchemaObjectBindingsGenerator` entry point in the historical
+`gradle/schema-bindings.gradle.kts` is no longer available. Consequently,
+`--prepare-only` alone does not prove that all generated contracts represent
+the new generator model. Regenerate and verify them against the published
+`pub.tool.General` 1.1 toolchain before uploading Security 1.1 to Cloudsmith.
+Do not edit generated source files manually.
+
+The current descriptors declare **five Java products and one Python product**:
+`credentials/core/intf` is Java/Python while `credentials/core/impl` and the
+three OS-specific secure stores remain Java-only. Existing but disabled Python
+implementation sources are deliberately not packaged or regenerated.
+
 ## 🔄 Continuous Integration (Algites CI)
 
 This repository uses the **Algites unified GitHub Actions CI pipeline**; build, test, and publish rules are centralized.

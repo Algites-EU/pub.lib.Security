@@ -10,5 +10,5 @@ GroupId: eu.algites.lib.security
 
 Version:
   ReleaseLineVersion: "1"
-  Revision: 0
+  Revision: 1
   QualifierKind: snapshot

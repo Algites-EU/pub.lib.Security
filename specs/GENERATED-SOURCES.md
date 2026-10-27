@@ -37,6 +37,15 @@ artifacts and technologies. Objects are discovered automatically. Its optional
 contract for union variants. There is deliberately no package override.
 All other documented behavior and wire IDs remain unchanged.
 
+
+> Migration note (Security 1.1): the original Gradle generator integration
+> below still references removed legacy CLI classes and an absent
+> `devtools/schema-field-bindings.json`. Those historical steps are **not**
+> implemented by the new standalone `devops/bootstrap.sh`. Use the published
+> current Defs/SDO generators to regenerate and verify the `.gen` trees before
+> the 1.1 Security snapshot upload. The bootstrap only packages already-present
+> native sources and tests them; it does not claim to have regenerated them.
+
 ## Clean checkout and GitHub
 
 Publish the updated `pub.tool.General` Defs Codegen artifacts first (the generator
