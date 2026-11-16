@@ -1,6 +1,6 @@
+from eu.algites.lib.security.credentials.core.aic_credential_wire_keys import AIcCredentialWireKeys
 import json
 
-from eu.algites.lib.security.credentials.core.aiig_credential_value_source_fields_1 import AIigCredentialValueSourceFields_1
 
 from eu.algites.lib.security.credentials.core.aic_credential import AIcCredential
 from eu.algites.lib.security.credentials.core.impl.standard.aic_credential_document_reader import AIcCredentialDocumentReader
@@ -31,11 +31,18 @@ class AIcCredentialService:
             raise AIxCredentialException("ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS does not contain valid JSON.") from exception
         if not isinstance(value, dict):
             raise AIxCredentialException("ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS must contain a JSON object.")
-        return value
+        return dict(AIcCredentialDocumentReader._normalize_profile_list(value, 'JSON'))
 
     def _write_document_object(self, value: dict) -> None:
+        # Persist only the canonical schema representation. Keep the internal
+        # keyed view for simple profile updates and backward-compatible reads.
+        document = {'Profile': [dict({'Id': profile_id}, **node)
+                                for profile_id, node in value.items()
+                                if profile_id != AIcCredentialWireKeys.SCHEMA_HINT]}
+        if AIcCredentialWireKeys.SCHEMA_HINT in value:
+            document[AIcCredentialWireKeys.SCHEMA_HINT] = value[AIcCredentialWireKeys.SCHEMA_HINT]
         self._store_provider.write_credential_document(
-            json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+            json.dumps(document, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         )
 
     def is_stored(self, profile: AIcCredentialProfile) -> bool:
@@ -53,7 +60,9 @@ class AIcCredentialService:
         for field in profile.type.supported_fields:
             value = credential.get_text(field)
             if value is not None:
-                typed[field.id] = {AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE: AInCredentialValueSource.DIRECT_VALUE.id, AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE: value}
+                typed[field.id] = {
+                    AIcCredentialWireKeys.SOURCE: AInCredentialValueSource.DIRECT_VALUE.id,
+                    AIcCredentialWireKeys.VALUE: value}
         profile_node[profile.type.property_name] = typed
         self._write_document_object(root)
 
@@ -85,7 +94,9 @@ class AIcCredentialService:
                     continue
                 typed = {}
                 for field, reference in values.items():
-                    typed[field.id] = {AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE: reference.source.id, AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE: reference.value}
+                    typed[field.id] = {
+                        AIcCredentialWireKeys.SOURCE: reference.source.id,
+                        AIcCredentialWireKeys.VALUE: reference.value}
                 profile_node[credential_type.property_name] = typed
             normalized[profile_id] = profile_node
         self._write_document_object(normalized)

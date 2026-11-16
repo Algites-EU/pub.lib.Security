@@ -1,33 +1,24 @@
 package eu.algites.lib.security.credentials.core.impl.standard;
 
 import eu.algites.lib.security.credentials.core.AIcCredentialDocument;
+import eu.algites.lib.security.credentials.core.AIcCredentialWireKeys;
 import eu.algites.lib.security.credentials.core.AIcCredentialValueReference;
 import eu.algites.lib.security.credentials.core.AInCredentialDocumentFormat;
 import eu.algites.lib.security.credentials.core.AInCredentialField;
 import eu.algites.lib.security.credentials.core.AInCredentialType;
 import eu.algites.lib.security.credentials.core.AInCredentialValueSource;
 import eu.algites.lib.security.credentials.core.AIxCredentialException;
-import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
-import eu.algites.lib.security.credentials.core.AIigCredentials_1;
-
-import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
-import eu.algites.lib.security.credentials.core.AIigCredentials_1;
-
-import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
-import eu.algites.lib.security.credentials.core.AIigCredentials_1;
-
-import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
-import eu.algites.lib.security.credentials.core.AIigCredentials_1;
-
-import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
-import eu.algites.lib.security.credentials.core.AIigCredentials_1;
-
-import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
-import eu.algites.lib.security.credentials.core.AIigCredentials_1;
 
 
+
+
+
+
+
+import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -59,6 +50,13 @@ public final class AIcCredentialDocumentReader {
     private static final int DETECTION_PREFIX_SIZE = 8192;
     private static final ObjectMapper JSON_MAPPER = new ObjectMapper();
     private static final ObjectMapper YAML_MAPPER = new ObjectMapper(new YAMLFactory());
+
+    static {
+        /* Reject repeated profile/type/field names before binding an object tree.
+         * The default JSON and YAML parsers otherwise silently retain the last value. */
+        JSON_MAPPER.getFactory().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
+        YAML_MAPPER.getFactory().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION);
+    }
 
     public AIcCredentialDocument read(String aDocument) {
         Objects.requireNonNull(aDocument, "Credential document must not be null.");
@@ -185,15 +183,52 @@ public final class AIcCredentialDocumentReader {
         }
     }
 
+    private static ObjectNode normalizeProfileList(JsonNode aRoot) {
+        if (!(aRoot instanceof ObjectNode locSource)) {
+            throw new AIxCredentialException("Credential document must contain a JSON/YAML object.");
+        }
+        if (!locSource.has("Profile")) {
+            return locSource;
+        }
+        Iterator<String> locKeys = locSource.fieldNames();
+        while (locKeys.hasNext()) {
+            String locKey = locKeys.next();
+            if (!"Profile".equals(locKey) && !AIcCredentialWireKeys.SCHEMA_HINT.equals(locKey)) {
+                throw new AIxCredentialException("Credential root mixes Profile with unsupported field '" + locKey + "'.");
+            }
+        }
+        JsonNode locArray = locSource.path("Profile");
+        if (!locArray.isArray()) {
+            throw new AIxCredentialException("Credential Profile must be an array.");
+        }
+        ObjectNode locResult = JSON_MAPPER.createObjectNode();
+        if (locSource.has(AIcCredentialWireKeys.SCHEMA_HINT)) {
+            locResult.set(AIcCredentialWireKeys.SCHEMA_HINT, locSource.get(AIcCredentialWireKeys.SCHEMA_HINT));
+        }
+        for (JsonNode locEntry : locArray) {
+            if (!locEntry.isObject() || !locEntry.path("Id").isTextual()) {
+                throw new AIxCredentialException("Each Credential Profile requires a string Id.");
+            }
+            String locId = locEntry.get("Id").textValue();
+            if (locId.isBlank() || locResult.has(locId)) {
+                throw new AIxCredentialException("Duplicate or empty Credential Profile Id '" + locId + "'.");
+            }
+            ObjectNode locCopy = ((ObjectNode) locEntry).deepCopy();
+            locCopy.remove("Id");
+            locResult.set(locId, locCopy);
+        }
+        return locResult;
+    }
+
     private AIcCredentialDocument fromObjectNode(JsonNode aRoot) {
         LinkedHashMap<String, Map<AInCredentialType, Map<AInCredentialField, AIcCredentialValueReference>>> locProfiles =
             new LinkedHashMap<>();
-        Iterator<Map.Entry<String, JsonNode>> locProfileIterator = aRoot.fields();
+        Iterator<Map.Entry<String, JsonNode>> locProfileIterator = normalizeProfileList(aRoot).fields();
         while (locProfileIterator.hasNext()) {
             Map.Entry<String, JsonNode> locProfileEntry = locProfileIterator.next();
             String locProfileId = locProfileEntry.getKey();
             JsonNode locProfileNode = locProfileEntry.getValue();
-            if (AIigCredentials_1.SCHEMA_FIELD_NAME__SCHEMA.equals(locProfileId)) {
+            if (AIcCredentialWireKeys.SCHEMA_HINT.equals(locProfileId)) {
                 if (!locProfileNode.isTextual()) {
                     throw new AIxCredentialException("Credential document '$schema' must be a string.");
                 }
@@ -263,8 +298,24 @@ public final class AIcCredentialDocumentReader {
         if (!aNode.isObject()) {
             throw fieldError(aProfileId, aType, aField, "must be an object containing Source and Value.");
         }
-        JsonNode locSourceNode = aNode.get(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE);
-        JsonNode locValueNode = aNode.get(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE);
+        /* Canonical format is Source/Value. Accept the previously generated
+         * Choice wrapper only when migrating older credential documents. */
+        String locVariant = null;
+        if (aNode.size() == 1) {
+            String locCandidate = aNode.fieldNames().next();
+            for (AInCredentialValueSource locSource : AInCredentialValueSource.values()) {
+                if (locSource.getChoiceVariant().equals(locCandidate)) {
+                    locVariant = locCandidate;
+                    aNode = aNode.path(locCandidate);
+                    if (!aNode.isObject())
+                        throw fieldError(aProfileId, aType, aField,
+                                "Choice alternative '" + locCandidate + "' must contain an object.");
+                    break;
+                }
+            }
+        }
+        JsonNode locSourceNode = aNode.get(AIcCredentialWireKeys.SOURCE);
+        JsonNode locValueNode = aNode.get(AIcCredentialWireKeys.VALUE);
         if (locSourceNode == null || !locSourceNode.isTextual()) {
             throw fieldError(aProfileId, aType, aField, "is missing string property 'Source'.");
         }
@@ -275,10 +326,11 @@ public final class AIcCredentialDocumentReader {
             throw fieldError(aProfileId, aType, aField, "contains unsupported properties.");
         }
         try {
-            return new AIcCredentialValueReference(
-                AInCredentialValueSource.fromId(locSourceNode.textValue()),
-                locValueNode.textValue()
-            );
+            AInCredentialValueSource locSource = AInCredentialValueSource.fromId(locSourceNode.textValue());
+            if (locVariant != null && !locVariant.equals(locSource.getChoiceVariant()))
+                throw fieldError(aProfileId, aType, aField,
+                        "Choice alternative '" + locVariant + "' conflicts with Source '" + locSourceNode.textValue() + "'.");
+            return new AIcCredentialValueReference(locSource, locValueNode.textValue());
         } catch (IllegalArgumentException aException) {
             throw fieldError(aProfileId, aType, aField, aException.getMessage());
         }
@@ -334,8 +386,8 @@ public final class AIcCredentialDocumentReader {
                                     "' does not support field '" + locField.getId() + "'."
                             );
                         }
-                        String locSource = requiredChildText(locFieldElement, AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE, locProfileId, locType, locField);
-                        String locValue = requiredChildText(locFieldElement, AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE, locProfileId, locType, locField);
+                        String locSource = requiredChildText(locFieldElement, AIcCredentialWireKeys.SOURCE, locProfileId, locType, locField);
+                        String locValue = requiredChildText(locFieldElement, AIcCredentialWireKeys.VALUE, locProfileId, locType, locField);
                         if (childElements(locFieldElement).size() != 2) {
                             throw fieldError(locProfileId, locType, locField, "contains unsupported XML elements.");
                         }

@@ -19,6 +19,21 @@ public enum AInCredentialValueSource {
         return id;
     }
 
+    /**
+     * Returns the named alternative that represents this source in JSON/YAML
+     * ValueSource choice objects. XML retains its Source and Value elements.
+     *
+     * @return the stable, case-sensitive property name for this source
+     */
+    public String getChoiceVariant() {
+        return switch (this) {
+            case DIRECT_VALUE -> "DirectValue";
+            case FILE_CONTENT -> "FileContent";
+            case SECRET_CONTENT -> "SecretContent";
+            case ENVIRONMENT_VARIABLE_CONTENT -> "EnvironmentVariableContent";
+        };
+    }
+
     public static AInCredentialValueSource fromId(String aId) {
         if (aId == null) {
             throw new IllegalArgumentException("Credential value source must not be null.");

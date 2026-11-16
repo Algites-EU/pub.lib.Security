@@ -13,6 +13,21 @@ class AInCredentialValueSource(Enum):
     def id(self) -> str:
         return self.value
 
+    @property
+    def choice_variant(self) -> str:
+        """Name of this source's JSON/YAML Choice alternative.
+
+        Returns:
+            The stable property name used to serialize one exclusive ValueSource
+            alternative. XML retains its existing Source/Value element layout.
+        """
+        return {
+            self.DIRECT_VALUE: "DirectValue",
+            self.FILE_CONTENT: "FileContent",
+            self.SECRET_CONTENT: "SecretContent",
+            self.ENVIRONMENT_VARIABLE_CONTENT: "EnvironmentVariableContent",
+        }[self]
+
     @classmethod
     def from_id(cls, value: str) -> "AInCredentialValueSource":
         if value is None:

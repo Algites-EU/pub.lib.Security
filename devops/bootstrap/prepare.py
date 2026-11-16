@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage all Modustro native modules for a standalone pub.lib.General publication.
+"""Stage Modustro native modules from the selected source repository.
 
 This helper does not invoke the Modustro Builder and never contacts Cloudsmith.
 It reads the repository's native artifact descriptors and generates a separate
@@ -10,8 +10,14 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import email
+import os
 import json
 from pathlib import Path
+from importlib.util import module_from_spec, spec_from_file_location
+_selfhost_spec = spec_from_file_location('modustro_bootstrap_selfhosting',
+                                      Path(__file__).with_name('selfhosting.py'))
+_selfhost = module_from_spec(_selfhost_spec)
+_selfhost_spec.loader.exec_module(_selfhost)
 import re
 import shutil
 import subprocess
@@ -22,22 +28,49 @@ import zipfile
 
 import yaml
 
-SOURCES = ('src/product/python', 'src/product/python.gen', 'src/product/config', 'src/product/resources',
-           'src/product/xmldefs', 'src/product/yamldefs', 'src/product/jsondefs')
+# Resources are discovered per artifact; bootstrap does not maintain a schema-kind
+# whitelist (a repository may introduce additional data formats).
+CODE_SOURCE_DIRS = {'java', 'java.extgen', 'java.gen',
+                    'python', 'python.extgen', 'python.gen'}
+
+
+def product_resource_dirs(artifact_root: Path) -> list[str]:
+    """Find resource roots declared by the product source-tree convention.
+
+    Exclude code roots, generated roots and tooling caches.  The returned
+    paths are relative to the artifact directory and remain stable across
+    different source repositories.
+    """
+    source = artifact_root / 'src/product'
+    if not source.is_dir():
+        return []
+    return ['src/product/' + part.name for part in sorted(source.iterdir())
+            if part.is_dir() and not part.is_symlink()
+            and part.name not in CODE_SOURCE_DIRS and part.name not in IGNORED
+            and not part.name.startswith('.') and not part.name.endswith('.gen')]
+
 IGNORED = {'__pycache__', '.pytest_cache', 'build', 'node_modules', '.mypy_cache'}
-JAVA_FIXED_VERSIONS = {
-    'com.fasterxml.jackson.core:jackson-databind': '2.18.3',
-    'com.fasterxml.jackson.dataformat:jackson-dataformat-yaml': '2.18.3',
-    'com.fasterxml.jackson.core:jackson-annotations': '2.18.3',
-}
 
 
-def artifact_id(path: Path) -> str:
-    return 'pub.lib.Security_' + '.'.join(path.parts)
+def artifact_id(repository: Path, path: Path) -> str:
+    descriptor = read_yaml(repository / 'modustro-source-repository.yml')
+    return str(descriptor['SourceRepository']['Id']) + '_' + '.'.join(path.parts)
 
 
-def python_name(identifier: str) -> str:
-    return 'eu-algites-' + re.sub('[^a-z0-9]+', '-', identifier.lower()).strip('-')
+def python_prefix(repository: Path) -> str:
+    """Derive the organization prefix from the first two GroupId segments."""
+    descriptor = read_yaml(repository / 'modustro-source-repository.yml')
+    group_id = str(descriptor.get('GroupId') or '')
+    components = group_id.split('.')
+    if len(components) < 2 or any(not re.fullmatch(r'[a-z][a-z0-9]*', part)
+                                   for part in components[:2]):
+        raise ValueError(f'Cannot derive Python distribution prefix from GroupId {group_id!r}')
+    return '-'.join(components[:2])
+
+
+def python_name(identifier: str, prefix: str) -> str:
+    """Convert the native artifact identifier to its configured distribution name."""
+    return prefix + '-' + re.sub('[^a-z0-9]+', '-', identifier.lower()).strip('-')
 
 
 def python_version(java_version: str, override: str | None) -> str:
@@ -94,18 +127,63 @@ def spec(requirement: dict | None, version: str) -> str:
     return spec({'Exact': version}, version)
 
 
-def java_version(name: str, requirement: dict | None) -> str:
+def java_version(name: str, requirement: dict | None, preferred: dict[str, str] | None = None) -> str:
+    """Keep descriptor version constraints instead of pinning bootstrap-only versions.
+
+    Gradle uses Maven-style range notation, e.g. [2.0.0,3.0.0). An Exact
+    requirement remains a fixed version. Selection within a range is done by
+    Gradle and should be locked by the eventual Builder dependency lockfile.
+    """
     req = requirement or {}
     if 'Exact' in req:
         return str(req['Exact'])
-    if name in JAVA_FIXED_VERSIONS:
-        return JAVA_FIXED_VERSIONS[name]
-    if 'Minimum' in req:
-        return str(req['Minimum']).removeprefix('>=')
-    raise ValueError(f'Cannot select a concrete Java dependency version for {name}: {req}')
+    if not req.get('Minimum') and not req.get('Maximum'):
+        raise ValueError(f'Cannot determine Java dependency range for {name}: {req}')
+    minimum = str(req.get('Minimum') or '').strip()
+    maximum = str(req.get('Maximum') or '').strip()
+    lower_exclusive = minimum.startswith('>') and not minimum.startswith('>=')
+    upper_exclusive = maximum.startswith('<') and not maximum.startswith('<=')
+    for op in ('>=', '<=', '>', '<', '=='):
+        if minimum.startswith(op):
+            minimum = minimum[len(op):]
+            break
+    for op in ('>=', '<=', '>', '<', '=='):
+        if maximum.startswith(op):
+            maximum = maximum[len(op):]
+            break
+    lower = '(' if lower_exclusive else '['
+    upper = ')' if upper_exclusive or req.get('MaximumStrict') else ']'
+    return f'{lower}{minimum},{maximum}{upper}'
+
+
+def technology_kinds(artifact: dict) -> frozenset[str]:
+    """Read native kinds from both compact and governed structured declarations.
+
+    ``TechnologyKinds: [java, python]`` and the richer
+    ``TechnologyKinds: {Items: [{TechnologyKind: java, BuildOutputTypes: ...}]}``
+    are equivalent for the limited purpose of discovering native build roots.
+    The full BuildOutputTypes declaration remains untouched in the descriptor.
+    """
+    declaration = artifact.get('TechnologyKinds') or []
+    if isinstance(declaration, dict):
+        declaration = declaration.get('Items') or []
+    if not isinstance(declaration, list):
+        raise ValueError('Artifact.TechnologyKinds must be a list or mapping with Items list')
+    kinds = set()
+    for item in declaration:
+        if isinstance(item, dict):
+            item = item.get('TechnologyKind')
+        if not isinstance(item, str) or not item.strip():
+            raise ValueError(f'Invalid Artifact.TechnologyKinds item: {item!r}')
+        kinds.add(item)
+    return frozenset(kinds)
 
 
 def module_records(repository: Path, release: str, py_release: str) -> list[dict]:
+    owner = str(read_yaml(repository / 'modustro-source-repository.yml')['SourceRepository']['Id'])
+    prefix = python_prefix(repository)
+    python_requires = os.environ.get('MODUSTRO_BOOTSTRAP_PYTHON_REQUIRES', '>=3.11')
+    owner_python_prefix = python_name(owner, prefix) + '-'
     records = []
     for path in sorted(repository.rglob('modustro-artifact.yml')):
         # No build output or virtual environment may become a source artifact.
@@ -113,10 +191,10 @@ def module_records(repository: Path, release: str, py_release: str) -> list[dict
         if any(part in IGNORED or part.startswith('.') for part in relative.parts):
             continue
         doc = read_yaml(path)
-        kinds = doc.get('Artifact', {}).get('TechnologyKinds', [])
+        kinds = technology_kinds(doc.get('Artifact', {}))
         if 'java' not in kinds and 'python' not in kinds:
             continue
-        identifier = artifact_id(relative)
+        identifier = artifact_id(repository, relative)
         dependencies = []
         python_deps = []
         for dep_group in doc.get('Dependencies') or []:
@@ -127,18 +205,28 @@ def module_records(repository: Path, release: str, py_release: str) -> list[dict
                     continue
                 dep_id = str(item['ArtifactId'])
                 if kind == 'modustro':
-                    configuration = ('api' if 'product_api' in usages else
-                                     'runtimeOnly' if 'product_runtime_only' in usages else
-                                     'compileOnly' if 'product_compile_only_implementation' in usages else
-                                     'implementation')
-                    required = item.get('VersionRequirement')
-                    # Products within this repository are staged as Gradle project dependencies.
-                    # Cross-repository dependencies are published Maven/Python artifacts.
-                    dependencies.append({'kind': 'modustro', 'artifactId': dep_id,
-                                         'configuration': configuration, 'groupId': str(item.get('GroupId') or ''),
-                                         'requirement': required})
-                    if 'python' in kinds and ('product_api' in usages or 'product_implementation' in usages):
-                        python_deps.append({'artifactId': dep_id, 'requirement': required})
+                    configuration = 'api' if 'product_api' in usages else 'implementation'
+                    if dep_id.startswith(owner + '_'):
+                        dependencies.append({'kind': 'project', 'artifactId': dep_id,
+                                             'configuration': configuration,
+                                             'groupId': str(item.get('GroupId') or ''),
+                                             'version': release})
+                        if 'python' in kinds:
+                            python_deps.append(python_name(dep_id, prefix) + '==' + py_release)
+                    else:
+                        # Dependencies belonging to another source repository are
+                        # published contracts, never local Gradle projects. The
+                        # bootstrap --root selection must not pull other trees in.
+                        group = str(item.get('GroupId') or '')
+                        if not group:
+                            raise ValueError(f'Missing group for external Modustro artifact {dep_id}')
+                        requirement = item.get('VersionRequirement') or {'Exact': release}
+                        external_version = str(requirement.get('Exact', release))
+                        dependencies.append({'kind': 'external',
+                                             'coordinate': f'{group}:{dep_id}:{external_version}',
+                                             'configuration': configuration, 'modustro': True})
+                        if 'python' in kinds:
+                            python_deps.append(python_name(dep_id, prefix) + spec(requirement, external_version))
                 elif kind == 'java' and 'java' in kinds:
                     name = str(item['GroupId']) + ':' + dep_id
                     config = ('compileOnlyApi' if 'product_compile_only_api' in usages else
@@ -153,64 +241,77 @@ def module_records(repository: Path, release: str, py_release: str) -> list[dict
             'name': str(doc['Artifact'].get('Name', identifier)),
             'description': str(doc['Artifact'].get('Description', identifier)),
             'java': 'java' in kinds, 'python': 'python' in kinds,
-            'dependencies': dependencies, 'pythonDependencies': python_deps,
+            'dependencies': dependencies, 'pythonDependencies': list(dict.fromkeys(python_deps)),
+            'resourceDirs': product_resource_dirs(path.parent),
+            'pythonName': python_name(identifier, prefix),
+            'pythonOwnerPrefix': owner_python_prefix,
+            'pythonRequires': str(python_requires),
+            'javaGeneratedCompletionPatterns': list(_selfhost.source_policy(
+                repository, identifier).get('JavaCompletionPatterns') or ()),
         })
     if not records:
         raise ValueError('No native Java or Python products declared in modustro-artifact.yml')
-    # Resolve internal modules from the current build. External modules keep the
-    # exact or bounded version requirement declared in their product descriptor.
+    # Artifact descriptors, rather than a manually maintained number of packages,
+    # determine which native products must be prepared and verified.
     lookup = {v['artifactId']: v for v in records}
     for record in records:
         for dep in record['dependencies']:
-            if dep['kind'] != 'modustro':
+            if dep['kind'] != 'project':
                 continue
             other = lookup.get(dep['artifactId'])
-            if other is not None:
-                if not other['java']:
-                    raise ValueError(f'Internal non-Java dependency: {dep["artifactId"]}')
-                if dep['groupId'] != other['groupId']:
-                    raise ValueError(f'Group ID mismatch for {dep["artifactId"]}: '
-                                     f'{dep["groupId"]} != {other["groupId"]}')
-                dep['kind'] = 'project'
+            if not other or not other['java']:
+                raise ValueError(f'Missing Java dependency for {record["artifactId"]}: {dep["artifactId"]}')
+            if dep['groupId'] and dep['groupId'] != other['groupId']:
+                raise ValueError(f'Group ID mismatch for {dep["artifactId"]}: descriptor says '
+                                 f'{dep["groupId"]}, module is {other["groupId"]}')
+        for package in record['pythonDependencies']:
+            prefix = package.split('==')[0]
+            # If it is an internal reference, it must really be a Python product.
+            if prefix.startswith(owner_python_prefix):
+                other = next((v for v in records if v['pythonName'] == prefix), None)
+                if not other or not other['python']:
+                    raise ValueError(f'Invalid Python dependency of {record["artifactId"]}: {package}')
+    return records
+
+
+def restrict_to_selection(records: list[dict], java_release: str, python_release: str) -> list[dict]:
+    """Compile/publish only selected products; resolve other products externally.
+
+    Internal dependencies outside --root must never implicitly widen the scope.
+    They retain their canonical coordinates and resolve through the configured
+    published/local repository. Python dependencies use an appropriate
+    snapshot version range instead of a newly generated unpublished timestamp.
+    """
+    ids = {record['artifactId'] for record in records}
+    for record in records:
+        converted = []
+        for dependency in record['dependencies']:
+            if dependency['kind'] == 'project' and dependency['artifactId'] not in ids:
+                converted.append({
+                    'kind': 'external',
+                    'configuration': dependency['configuration'],
+                    'coordinate': dependency['groupId'] + ':' + dependency['artifactId'] + ':' + java_release,
+                    'modustro': True,
+                })
             else:
-                if not dep['groupId']:
-                    raise ValueError(f'Missing group ID for external dependency: {dep["artifactId"]}')
-                # Only an explicit exact version or the accepted General 1.1 line
-                # can be selected unambiguously for the current migration.
-                requirement = dep['requirement'] or {}
-                if 'Exact' in requirement:
-                    selected = str(requirement['Exact'])
-                elif dep['artifactId'].startswith('pub.lib.General_') and str(requirement.get('Minimum')) == '>1.0':
-                    selected = '1.1-SNAPSHOT'
-                else:
-                    raise ValueError(f'Unpinned cross-repository Maven dependency of '
-                                     f'{record["artifactId"]}: {dep}')
-                dep['kind'] = 'external'
-                dep['coordinate'] = dep['groupId'] + ':' + dep['artifactId'] + ':' + selected
-        resolved_python = []
-        for dep in record['pythonDependencies']:
-            if isinstance(dep, str):
-                resolved_python.append(dep)
-                continue
-            other = lookup.get(dep['artifactId'])
-            if other is not None:
-                if not other['python']:
-                    raise ValueError(f'Internal dependency has no Python distribution: {dep["artifactId"]}')
-                resolved_python.append(python_name(dep['artifactId']) + '==' + py_release)
+                converted.append(dependency)
+        record['dependencies'] = converted
+        if java_release.endswith('-SNAPSHOT'):
+            base = java_release.removesuffix('-SNAPSHOT')
+            replacement = f'>={base}.dev0,<{base}a0'
+        else:
+            replacement = f'=={java_release}'
+        selected_python_names = {item['pythonName'] for item in records if item['python']}
+        updated = []
+        for requirement in record['pythonDependencies']:
+            name, separator, constraint = requirement.partition('==')
+            if (separator and constraint == python_release
+                    and name.startswith(record['pythonOwnerPrefix'])
+                    and name not in selected_python_names):
+                updated.append(name + replacement)
             else:
-                requirement = dep['requirement'] or {}
-                # A published General snapshot has its own Python dev timestamp.
-                # Selecting the 1.1 release line avoids erroneously pinning it to
-                # the Security invocation's independent timestamp.
-                exact = str(requirement.get('Exact', ''))
-                if exact.endswith('-SNAPSHOT'):
-                    prefix = exact.removesuffix('-SNAPSHOT')
-                elif dep['artifactId'].startswith('pub.lib.General_') and str(requirement.get('Minimum')) == '>1.0':
-                    prefix = '1.1'
-                else:
-                    raise ValueError(f'Cannot map external Python Modustro requirement: {dep}')
-                resolved_python.append(python_name(dep['artifactId']) + f'>={prefix}.dev0,<{prefix}a0')
-        record['pythonDependencies'] = list(dict.fromkeys(resolved_python))
+                updated.append(requirement)
+        record['pythonDependencies'] = updated
     return records
 
 
@@ -221,23 +322,61 @@ def stage_gradle(repository: Path, work: Path, records: list[dict], version: str
     for number, record in enumerate(java_modules, 1):
         record['gradleProject'] = 'native%03d' % number
     ids = {r['artifactId']: r['gradleProject'] for r in java_modules}
-    modules = [{'project': r['gradleProject'], 'groupId': r['groupId'], 'artifactId': r['artifactId'],
-                'hasTests': (repository / r['path'] / 'src/develop/java').is_dir(),
+    modules = [{'project': r['gradleProject'], 'groupId': r['groupId'], 'artifactId': r['artifactId'], 'path': r['path'],
+                'resourceDirs': r['resourceDirs'],
+                'javaGeneratedCompletionPatterns': r['javaGeneratedCompletionPatterns'],
                 'dependencies': [{'kind': d['kind'], 'configuration': d['configuration'],
                                   'target': ids[d['artifactId']] if d['kind'] == 'project' else d['coordinate']}
                                  for d in r['dependencies']]}
                for r in java_modules]
     (stage / 'modules.json').write_text(json.dumps(modules, indent=2), encoding='utf-8')
-    lines = ["rootProject.name = 'algites-pub-lib-security-native-bootstrap'"]
+    lines = ["rootProject.name = 'modustro-native-bootstrap'"]
     for r in java_modules:
         # JSON encoded paths are valid Groovy double-quoted string literals.
         lines.append('include(' + json.dumps(':' + r['gradleProject']) + ')')
         lines.append('project(' + json.dumps(':' + r['gradleProject']) + ').projectDir = file(' +
                      json.dumps(str(repository / r['path'])) + ')')
     (stage / 'settings.gradle').write_text('\n'.join(lines) + '\n', encoding='utf-8')
-    build = '''import groovy.json.JsonSlurper\n\ndef manifest = new JsonSlurper().parse(new File(rootProject.projectDir, 'modules.json'))\ndef configByProject = manifest.collectEntries { [(it.project): it] }\ndef outputRoot = new File(System.getenv('MODUSTRO_SECURITY_BOOTSTRAP_OUTPUT') ?: rootProject.projectDir)\nlayout.buildDirectory.set(new File(outputRoot, 'gradle-build/root'))\nsubprojects { project ->\n    def config = configByProject[project.name]\n    if (config == null) throw new GradleException("Missing bootstrap configuration: ${project.name}")\n    project.layout.buildDirectory.set(new File(outputRoot, 'gradle-build/modules/' + project.name))\n    apply plugin: 'java-library'\n    apply plugin: 'maven-publish'\n    group = config.groupId\n    version = System.getenv('MODUSTRO_SECURITY_BOOTSTRAP_VERSION') ?: '1.1-SNAPSHOT'\n    repositories {\n        def bootstrapMode = System.getenv('MODUSTRO_BOOTSTRAP_DEPENDENCY_MODE') ?: 'remote'\n        if (bootstrapMode != 'remote') maven { name = 'modustro-local'; url = uri(System.getenv('MODUSTRO_LOCAL_MAVEN_REPOSITORY') ?: new File(System.getenv('MODUSTRO_HOME') ?: new File(System.getProperty('user.home'), '.modustro').path, 'artifact-repos/java/maven')) }\n        if (bootstrapMode == 'remote') maven {\n            url = uri('https://dl.cloudsmith.io/public/algites/java-snapshots-pub/maven/')\n            content { includeGroupByRegex('eu\\\\.algites\\\\..*') }\n        }\n        mavenCentral()\n    }\n    java { withSourcesJar() }\n    tasks.withType(JavaCompile).configureEach { options.release = 17 }\n    sourceSets {\n        main {\n            java.srcDirs = ['src/product/java', 'src/product/java.gen']\n            resources.srcDirs = ['src/product/config', 'src/product/resources',\n                                 'src/product/jsondefs', 'src/product/yamldefs', 'src/product/xmldefs']\n        }\n        test {\n            java.srcDirs = ['src/develop/java']\n            resources.srcDirs = ['src/develop/resources', 'src/develop/config']\n        }\n    }\n    tasks.withType(Test).configureEach { useTestNG() }\n    dependencies {\n        if (config.hasTests) testImplementation 'org.testng:testng:7.11.0'\n        config.dependencies.each { d ->\n            if (d.kind == 'project') {\n                add(d.configuration, rootProject.project(':' + d.target))\n            } else {\n                add(d.configuration, d.target)\n            }\n        }\n    }\n    publishing {\n        publications {\n            mavenJava(MavenPublication) {\n                from components.java\n                artifactId = config.artifactId\n            }\n        }\n        repositories {\n            maven { name = 'Bootstrap'; url = uri(new File(outputRoot, 'maven-repository')) }\n        }\n    }\n}\n'''
+    remote_groups = sorted({dep['coordinate'].split(':', 1)[0]
+                            for rec in records for dep in rec['dependencies']
+                            if dep.get('modustro') and dep['kind'] == 'external'}
+                           | {group for group in os.environ.get('MODUSTRO_BOOTSTRAP_SOURCE_GROUPS', '').split(',')
+                              if group})
+    build = '''import groovy.json.JsonSlurper\n\ndef manifest = new JsonSlurper().parse(new File(rootProject.projectDir, 'modules.json'))\ndef configByProject = manifest.collectEntries { [(it.project): it] }\nrootProject.ext.bootstrapRemoteModustroGroups = __MODUSTRO_REMOTE_GROUP_IDS__\ndef outputRoot = new File(System.getenv('MODUSTRO_BOOTSTRAP_NATIVE_OUTPUT') ?: rootProject.projectDir)\nlayout.buildDirectory.set(new File(outputRoot, 'gradle-build/root'))\nsubprojects { project ->\n    def config = configByProject[project.name]\n    if (config == null) throw new GradleException("Missing bootstrap configuration: ${project.name}")\n    project.layout.buildDirectory.set(new File(outputRoot, 'gradle-build/modules/' + project.name))\n    apply plugin: 'java-library'\n    apply plugin: 'maven-publish'\n    group = config.groupId\n    version = System.getenv('MODUSTRO_BOOTSTRAP_NATIVE_VERSION') ?: 'unspecified'\n    repositories {\n        def bootstrapMode = System.getenv('MODUSTRO_BOOTSTRAP_DEPENDENCY_MODE') ?: 'remote'\n        def sourceRepository = System.getenv('MODUSTRO_LOCAL_MAVEN_REPOSITORY') ?: new File(System.getenv('MODUSTRO_HOME') ?: new File(System.getProperty('user.home'), '.modustro').path, 'artifact-repos/java/maven')\n        if (bootstrapMode == 'source' && !rootProject.ext.bootstrapRemoteModustroGroups.isEmpty()) {\n            // Never resolve Modustro sources from Maven Central or stale remote snapshots.\n            exclusiveContent {\n                forRepository { maven { name = 'modustro-sources-only'; url = uri(sourceRepository) } }\n                filter { rootProject.ext.bootstrapRemoteModustroGroups.each { includeGroup(it) } }\n            }\n        } else if (bootstrapMode != 'remote') maven { name = 'modustro-local'; url = uri(sourceRepository) }\n        if (bootstrapMode == 'remote') maven {\n            name = 'modustro-remote'\n            url = uri(System.getenv('MODUSTRO_BOOTSTRAP_REMOTE_MAVEN_URL'))\n            // Do not filter this repository by direct dependency groups: published\n            // Modustro POMs can bring transitive dependencies from other groups.\n            // Maven Central below remains a fallback for unrelated libraries.\n        }\n        mavenCentral()\n    }\n    java { withSourcesJar() }\n    tasks.withType(JavaCompile).configureEach { options.release = Integer.parseInt(System.getenv('MODUSTRO_BOOTSTRAP_JAVA_RELEASE')) }\n    sourceSets {\n        main {\n            // A repository's explicit specialization may require exclusive
+            // compilation from either the seed tree OR completed generated
+            // output. Never compile duplicate FQCNs from both roots.
+            def completionPatterns = config.javaGeneratedCompletionPatterns ?: []
+            def generated = new File(project.projectDir, 'src/product/java.gen')
+            def seed = new File(project.projectDir, 'src/product/java.extgen')
+            if (!completionPatterns.isEmpty() && seed.isDirectory()) {
+                def prepared = generated.isDirectory() && completionPatterns.every { pattern ->
+                    !fileTree(generated).matching { include pattern }.isEmpty()
+                }
+                def useSeed = (System.getenv('MODUSTRO_BOOTSTRAP_SDO_ABI_SEED') == '1') || !prepared
+                java.srcDirs = ['src/product/java', useSeed ? 'src/product/java.extgen' : 'src/product/java.gen']
+                logger.lifecycle('Compiler seed selection for ' + config.artifactId + ': ' +
+                        (useSeed ? 'extgen' : 'gen'))
+            } else {
+                java.srcDirs = ['src/product/java', 'src/product/java.extgen', 'src/product/java.gen']
+            }
+            // Explicitly ignore stale historical SDO files after overlay extraction.
+            java.exclude '**/eu/algites/tool/codegen/sdo/old/**'\n            if (config.artifactId == 'pub.tool.General_generators.code.defscodegen.intf') {\n                java.exclude '**/impl/intf/AIigd*.java', '**/impl/AIcgd*.java'\n            }\n            resources.srcDirs = __MODUSTRO_RESOURCE_SOURCE_DIRS__\n        }\n    }\n    dependencies {\n        config.dependencies.each { d ->\n            if (d.kind == 'project') {\n                add(d.configuration, rootProject.project(':' + d.target))\n            } else {\n                add(d.configuration, d.target)\n            }\n        }\n    }\n    publishing {\n        publications {\n            mavenJava(MavenPublication) {\n                from components.java\n                artifactId = config.artifactId\n            }\n        }\n        repositories {\n            maven { name = 'Bootstrap'; url = uri(new File(outputRoot, 'maven-repository')) }\n        }\n    }\n}\n'''
+    build = build.replace('__MODUSTRO_RESOURCE_SOURCE_DIRS__', 'config.resourceDirs')
+    build = build.replace('__MODUSTRO_REMOTE_GROUP_IDS__', json.dumps(remote_groups))
+    # The same universal SDO phase is applied to every staged Gradle build.
+    # It runs after initial classes, before the final publication rebuild.
+    build += '\nrootProject.ext.bootstrapSdoManifest = manifest\n'
+    build += 'apply from: ' + json.dumps(str((Path(__file__).parent / 'sdo-java.gradle').resolve())) + '\n'
     (stage / 'build.gradle').write_text(build, encoding='utf-8')
     (stage / 'release-version.txt').write_text(version + '\n', encoding='utf-8')
+
+
+def python_source_dirs(native_source: Path, artifact_identifier: str) -> tuple[str, ...]:
+    """Choose explicit compiler-ABI seed or complete generated source tree."""
+    repository = Path(os.environ.get('MODUSTRO_BOOTSTRAP_REPOSITORY') or
+                      Path(__file__).resolve().parents[2]).resolve()
+    return _selfhost.source_directories(native_source, artifact_identifier,
+                                        'python', repository)
 
 
 def stage_one_python(repository: Path, work: Path, record: dict, release: str) -> Path:
@@ -245,12 +384,22 @@ def stage_one_python(repository: Path, work: Path, record: dict, release: str) -
     source_target = package / 'src'
     source_target.mkdir(parents=True, exist_ok=True)
     native_source = repository / record['path']
-    for subdir in SOURCES:
+    for subdir in (*python_source_dirs(native_source, record['artifactId']),
+                   *product_resource_dirs(native_source)):
         source = native_source / subdir
         if not source.is_dir():
             continue
         for file in sorted(source.rglob('*')):
             if not file.is_file() or file.suffix in ('.pyc', '.pyo') or any(p in IGNORED for p in file.parts):
+                continue
+            # Defs intf temporary *.gen holds both Defs and SDO contracts.
+            # Publish only Defs declarations from this interface artifact.
+            if (record['path'] == 'generators/code/defscodegen/intf'
+                    and file.suffix == '.py'
+                    and file.stem.startswith(('aiigd_', 'aicgd_'))):
+                continue
+            relative_parts = file.relative_to(source).parts
+            if relative_parts[:6] == ('eu', 'algites', 'tool', 'codegen', 'sdo', 'old'):
                 continue
             dst = source_target / file.relative_to(source)
             if dst.exists():
@@ -259,22 +408,25 @@ def stage_one_python(repository: Path, work: Path, record: dict, release: str) -
                 continue
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(file, dst)
-    if not list(source_target.rglob('*.py')):
+    if not any(f.is_file() for f in source_target.rglob('*')):
         raise ValueError(f'Empty Python product for {record["artifactId"]}')
     license_file = repository / 'LICENSE'
     if license_file.is_file():
         shutil.copy2(license_file, package / 'LICENSE')
     toml = ('[build-system]\nrequires = ["setuptools>=69", "wheel"]\n'
             'build-backend = "setuptools.build_meta"\n\n'
-            '[project]\nname = ' + json.dumps(python_name(record['artifactId'])) + '\n'
+            '[project]\nname = ' + json.dumps(record['pythonName']) + '\n'
             'version = ' + json.dumps(release) + '\n'
             'description = ' + json.dumps(record['description']) + '\n'
-            'requires-python = ">=3.11"\n'
+            'requires-python = ' + json.dumps(record['pythonRequires']) + '\n'
             'dependencies = ' + json.dumps(record['pythonDependencies']) + '\n\n'
+            '[tool.setuptools]\ninclude-package-data = true\n\n'
             '[tool.setuptools.packages.find]\nwhere = ["src"]\nnamespaces = true\n\n'
-            '[tool.setuptools.package-data]\n"*" = ["*.settings", "*.yml", "*.yaml", "*.json", "*.xsd", "*.xml", "*.py"]\n')
+            '[tool.setuptools.package-data]\n"*" = ["*", "**/*"]\n')
     (package / 'pyproject.toml').write_text(toml, encoding='utf-8')
-    (package / 'MANIFEST.in').write_text('recursive-include src *.py *.settings *.yml *.yaml *.json *.xsd *.xml\n', encoding='utf-8')
+    # Every staged product resource is part of the distribution, irrespective
+    # of its file extension.  Do not silently omit e.g. .properties files.
+    (package / 'MANIFEST.in').write_text('recursive-include src *\n', encoding='utf-8')
     return package
 
 
@@ -300,27 +452,68 @@ def package_python(repository: Path, work: Path, records: list[dict], release: s
         if len(sdists) != 1 or len(wheels) != 1:
             raise RuntimeError(f'Unexpected Python build output for {record["artifactId"]}:\n{output.stdout[-3000:]}')
         sdist, wheel = sdists[0], wheels[0]
-        verify_python_distribution(record, release, wheel, sdist)
+        verify_python_distribution(record, release, wheel, sdist, package / 'src')
         manifest.append((str(wheel), str(sdist)))
         print(f'Python package verified: {record["artifactId"]}', flush=True)
     (work / 'python-packages.tsv').write_text(''.join('\t'.join(row)+'\n' for row in manifest), encoding='utf-8')
 
 
-def verify_python_distribution(record: dict, release: str, wheel: Path, sdist: Path) -> None:
+def expected_python_files(staged_source: Path) -> dict[str, Path]:
+    """Return product files copied to the distribution's source tree.
+
+    setuptools creates its own ``*.egg-info`` metadata below ``src`` while
+    building.  It is not part of the product and must not be expected inside
+    the installed package.  All other staged files, regardless of extension,
+    must survive both the wheel and source distribution unchanged.
+    """
+    return {
+        file.relative_to(staged_source).as_posix(): file
+        for file in sorted(staged_source.rglob('*'))
+        if file.is_file() and not any(part.endswith('.egg-info') for part in
+                                       file.relative_to(staged_source).parts)
+    }
+
+
+def verify_python_distribution(record: dict, release: str, wheel: Path,
+                               sdist: Path, staged_source: Path) -> None:
+    """Verify identity and exact staged product contents of both artifacts.
+
+    Namespace packages need not live below a specific Algites package root:
+    Validate actual source files rather than assuming any package namespace
+    or any fixed list of resource formats.
+    """
     if not wheel.is_file() or not sdist.is_file():
         raise FileNotFoundError(f'Missing distribution: {wheel}, {sdist}')
+    expected = expected_python_files(staged_source)
+    if not expected:
+        raise ValueError(f'Empty Python product for {record["artifactId"]}: {staged_source}')
     with zipfile.ZipFile(wheel) as archive:
-        paths = archive.namelist()
+        paths = set(archive.namelist())
         meta_files = [name for name in paths if name.endswith('.dist-info/METADATA')]
-        if len(meta_files) != 1 or not any(p.endswith('.py') and p.startswith('eu/algites/') for p in paths):
-            raise ValueError(f'Incomplete wheel: {wheel}')
+        if len(meta_files) != 1:
+            raise ValueError(f'Wheel must have exactly one METADATA file: {wheel}')
         metadata = email.message_from_bytes(archive.read(meta_files[0]))
         norm = lambda name: re.sub('[-_.]+', '-', name).lower()
-        if norm(metadata['Name']) != norm(python_name(record['artifactId'])) or metadata['Version'] != release:
+        if norm(metadata['Name'] or '') != norm(record['pythonName']) or metadata['Version'] != release:
             raise ValueError(f'Incorrect Python distribution identity/version in {wheel}')
+        for name, source in expected.items():
+            if name not in paths:
+                raise ValueError(f'Wheel is missing product file {name}: {wheel}')
+            if archive.read(name) != source.read_bytes():
+                raise ValueError(f'Wheel has modified product file {name}: {wheel}')
     with tarfile.open(sdist, 'r:gz') as archive:
+        members = {member.name.split('/src/', 1)[1]: member
+                   for member in archive.getmembers()
+                   if member.isfile() and '/src/' in member.name}
         if not any(path.endswith('/PKG-INFO') for path in archive.getnames()):
             raise ValueError(f'Source distribution missing PKG-INFO: {sdist}')
+        for name, source in expected.items():
+            member = members.get(name)
+            if member is None:
+                raise ValueError(f'Source distribution is missing product file {name}: {sdist}')
+            stream = archive.extractfile(member)
+            if stream is None or stream.read() != source.read_bytes():
+                raise ValueError(f'Source distribution has modified product file {name}: {sdist}')
 
 
 def maven_publication_files(directory: Path, artifact_id: str, release: str) -> tuple[Path, Path, Path, Path]:
@@ -402,7 +595,55 @@ def maven_publication_files(directory: Path, artifact_id: str, release: str) -> 
     return actual
 
 
-def verify_maven(work: Path, records: list[dict], release: str) -> None:
+def expected_java_resources(artifact_root: Path) -> dict[str, Path]:
+    """Map Gradle resource paths to their corresponding product source files.
+
+    Each Gradle resource directory is a resource *root*: its own directory name
+    is not included in the JAR entry.  Read the same roots used by stage_gradle
+    so schema-only artifacts and naming-profile resources can be verified
+    without special-casing a package or repository name.
+    """
+    resources: dict[str, Path] = {}
+    for directory in product_resource_dirs(artifact_root):
+        source_root = artifact_root / directory
+        if not source_root.is_dir():
+            continue
+        for source in sorted(source_root.rglob('*')):
+            if not source.is_file():
+                continue
+            entry = source.relative_to(source_root).as_posix()
+            previous = resources.get(entry)
+            if previous is not None and previous.read_bytes() != source.read_bytes():
+                raise ValueError(f'Conflicting Java resources {entry}: {previous} and {source}')
+            resources[entry] = source
+    return resources
+
+
+def verify_java_jar(jar: Path, artifact_root: Path) -> None:
+    """Require compiled Java classes when declared, and all product resources.
+
+    Resource-only artifacts (schemas, naming catalogs, settings) are valid.
+    A MANIFEST-only JAR or a JAR missing a declared source/resource is not.
+    """
+    java_sources = [source for directory in ('java', 'java.gen')
+                    for source in (artifact_root / 'src' / 'product' / directory).rglob('*.java')
+                    if source.is_file()]
+    resources = expected_java_resources(artifact_root)
+    with zipfile.ZipFile(jar) as archive:
+        names = set(archive.namelist())
+        compiled = any(name.endswith('.class') for name in names)
+        if java_sources and not compiled:
+            raise ValueError(f'JAR is missing compiled Java classes for {artifact_root}: {jar}')
+        for entry, source in resources.items():
+            if entry not in names:
+                raise ValueError(f'JAR is missing product resource {entry} from {source}: {jar}')
+            if archive.read(entry) != source.read_bytes():
+                raise ValueError(f'JAR contains outdated or modified product resource {entry}: {jar}')
+        if not compiled and not resources:
+            raise ValueError(f'JAR has neither compiled classes nor product resources: {jar}')
+
+
+def verify_maven(repository: Path, work: Path, records: list[dict], release: str) -> None:
     maven = work / 'maven-repository'
     rows = []
     for record in records:
@@ -417,47 +658,17 @@ def verify_maven(work: Path, records: list[dict], release: str) -> None:
                                                        ('artifactId', record['artifactId']),
                                                        ('version', release)]):
             raise ValueError(f'Incorrect Maven POM coordinates for {record["artifactId"]}: {names}')
-        with zipfile.ZipFile(jar) as archive:
-            if not any(n.endswith('.class') for n in archive.namelist()):
-                if not any(n.endswith(('.yml', '.yaml', '.gradle.kts', '.xml', '.xsd')) for n in archive.namelist()):
-                    raise ValueError(f'JAR has neither compiled classes nor profile resources: {jar}')
+        verify_java_jar(jar, repository / record['path'])
         rows.append((str(jar), str(pom), str(module), str(sources)))
     (work / 'packages.tsv').write_text(''.join('\t'.join(row) + '\n' for row in rows), encoding='utf-8')
     print(f'Maven publications verified: {len(rows)}', flush=True)
 
 
-def test_python(repository: Path, records: list[dict], python_command: str) -> None:
-    """Test declared Python products without attempting to test disabled technologies."""
-    import os
-    passed = 0
-    for record in records:
-        if not record['python']:
-            continue
-        module = repository / record['path']
-        root = module / 'src/develop/python'
-        if not root.is_dir():
-            continue
-        test_files = [file for file in root.rglob('test_*.py') if file.is_file()]
-        if not test_files:
-            continue
-        search_path = [str(module / src) for src in ('src/product/python', 'src/product/python.gen')
-                       if (module / src).is_dir()]
-        env = os.environ.copy()
-        env['PYTHONPATH'] = os.pathsep.join(search_path + ([env['PYTHONPATH']] if env.get('PYTHONPATH') else []))
-        env['PYTHONDONTWRITEBYTECODE'] = '1'
-        env['PYTEST_ADDOPTS'] = (env.get('PYTEST_ADDOPTS', '') + ' -p no:cacheprovider').strip()
-        proc = subprocess.run([python_command, '-m', 'pytest', '-q', str(root)],
-                              env=env, cwd=repository, check=False)
-        if proc.returncode:
-            raise RuntimeError(f'Python development tests failed: {record["artifactId"]}')
-        passed += 1
-    print(f'Python tested artifact groups: {passed}', flush=True)
-
-
 def main() -> None:
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action',choices=('plan','package-python','verify-maven','test-python'))
+    parser.add_argument('action',choices=('plan','package-python','verify-maven'))
     parser.add_argument('--repository',type=Path,required=True)
+    parser.add_argument('--root',type=Path,help='Limit the source artifacts to this repository subtree')
     parser.add_argument('--output',type=Path,required=True)
     parser.add_argument('--version',required=True)
     parser.add_argument('--python-version')
@@ -476,6 +687,14 @@ def main() -> None:
         if args.python_version and args.python_version != release:
             raise ValueError('Python version changed during bootstrap')
     records=module_records(repository,args.version,release)
+    if args.root is not None:
+        root = args.root.resolve(strict=True)
+        if not root.is_dir() or not root.is_relative_to(repository):
+            raise ValueError(f'Invalid bootstrap root outside source repository: {root}')
+        selected = [r for r in records if (repository / r['path']).is_relative_to(root)]
+        if not selected:
+            raise ValueError(f'No Java/Python source artifacts beneath {root}')
+        records = restrict_to_selection(selected, args.version, release)
     (output/'artifacts.json').write_text(json.dumps(records,indent=2),encoding='utf-8')
     if args.action == 'plan':
         stage_gradle(repository,output,records,args.version)
@@ -484,9 +703,7 @@ def main() -> None:
     elif args.action=='package-python':
         package_python(repository,output,records,release,args.python_executable)
     elif args.action=='verify-maven':
-        verify_maven(output,records,args.version)
-    elif args.action=='test-python':
-        test_python(repository,records,args.python_executable)
+        verify_maven(repository,output,records,args.version)
 
 if __name__ == '__main__':
     main()

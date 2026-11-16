@@ -92,6 +92,37 @@ public final class AItcCredentialDocumentReaderTest {
         Assert.expectThrows(AIxCredentialException.class, () -> locReader.readYaml("$schema: 4\n"));
     }
 
+
+    /**
+     * Ensures the one-of-four-but-distinct profile map is shared across the
+     * JSON, YAML and XML forms, including rejecting an empty XML xs:all group.
+     */
+    @Test
+    public void testRejectsEmptyProfileInAllFormats() {
+        AIcCredentialDocumentReader locReader = new AIcCredentialDocumentReader();
+        Assert.expectThrows(AIxCredentialException.class, () -> locReader.readJson("{\"profile\":{}}"));
+        Assert.expectThrows(AIxCredentialException.class, () -> locReader.readYaml("profile: {}\n"));
+        Assert.expectThrows(AIxCredentialException.class, () -> locReader.readXml(
+            "<CredentialDocument><Profile Id=\"profile\"/></CredentialDocument>"));
+    }
+
+    /**
+     * A duplicate credential type must fail in every input format instead of
+     * silently overwriting its first occurrence during JSON/YAML parsing.
+     */
+    @Test
+    public void testRejectsDuplicateCredentialTypeInAllFormats() {
+        AIcCredentialDocumentReader locReader = new AIcCredentialDocumentReader();
+        Assert.expectThrows(AIxCredentialException.class, () -> locReader.readJson(
+            "{\"profile\":{\"Basic\":{},\"Basic\":{}}}"));
+        Assert.expectThrows(AIxCredentialException.class, () -> locReader.readYaml(
+            "profile:\n  Basic: {}\n  Basic: {}\n"));
+        Assert.expectThrows(AIxCredentialException.class, () -> locReader.readXml(
+            XML_DOCUMENT.replace("</Profile>", XML_DOCUMENT.substring(
+                XML_DOCUMENT.indexOf("<Basic>"), XML_DOCUMENT.indexOf("</Basic>") + "</Basic>".length())
+                + "</Profile>")));
+    }
+
     private static void assertBasic(AIcCredentialDocument aDocument) {
         var locValues = aDocument.getCredentialValues("profile", AInCredentialType.BASIC).orElseThrow();
         Assert.assertEquals(locValues.get(AInCredentialField.USERNAME).getSource(), AInCredentialValueSource.DIRECT_VALUE);

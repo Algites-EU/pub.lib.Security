@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from eu.algites.lib.security.credentials.core.aiig_credential_value_source_fields_1 import AIigCredentialValueSourceFields_1
-from eu.algites.lib.security.credentials.core.aiig_credentials_1 import AIigCredentials_1
+from eu.algites.lib.security.credentials.core.aic_credential_wire_keys import AIcCredentialWireKeys
+
 
 
 
@@ -108,7 +108,15 @@ class AIcCredentialDocumentReader:
     @staticmethod
     def _load_json(stream: BinaryIO) -> object:
         try:
-            return json.load(stream)
+            def unique_pairs(pairs):
+                result = {}
+                for key, value in pairs:
+                    if key in result:
+                        raise AIxCredentialException(f"Duplicate JSON credential property {key!r}.")
+                    result[key] = value
+                return result
+
+            return json.load(stream, object_pairs_hook=unique_pairs)
         except (json.JSONDecodeError, UnicodeDecodeError) as exception:
             raise AIxCredentialException("Credential document is not valid JSON.") from exception
 
@@ -119,16 +127,61 @@ class AIcCredentialDocumentReader:
         except ImportError as exception:
             raise AIxCredentialException("YAML credential documents require the PyYAML package.") from exception
         try:
-            return yaml.safe_load(stream)
+            class UniqueMappingLoader(yaml.SafeLoader):
+                """Reject duplicate YAML keys rather than overwriting a credential."""
+
+            def construct_unique_mapping(loader, node):
+                loader.flatten_mapping(node)
+                result = {}
+                for key_node, value_node in node.value:
+                    key = loader.construct_object(key_node, deep=True)
+                    if key in result:
+                        raise AIxCredentialException(f"Duplicate YAML credential property {key!r}.")
+                    result[key] = loader.construct_object(value_node, deep=True)
+                return result
+
+            UniqueMappingLoader.add_constructor(
+                yaml.resolver.BaseResolver.DEFAULT_MAPPING_TAG, construct_unique_mapping
+            )
+            return yaml.load(stream, Loader=UniqueMappingLoader)
         except yaml.YAMLError as exception:
             raise AIxCredentialException("Credential document is not valid YAML.") from exception
+
+    @staticmethod
+    def _normalize_profile_list(root: Mapping, format_name: str) -> Mapping:
+        """Accept canonical Profile[] and the legacy ID-keyed document shape.
+
+        JSON/YAML writers emit Profile[] with explicit Id. Legacy documents
+        remain readable, but duplicate Id or unrecognized root keys fail.
+        """
+        if 'Profile' not in root:
+            return root
+        if any(key not in ('Profile', AIcCredentialWireKeys.SCHEMA_HINT) for key in root):
+            raise AIxCredentialException(f"{format_name} credential root mixes Profile with unknown fields.")
+        entries = root['Profile']
+        if not isinstance(entries, list):
+            raise AIxCredentialException(f"{format_name} Profile must be an array.")
+        normalized = {}
+        if AIcCredentialWireKeys.SCHEMA_HINT in root:
+            normalized[AIcCredentialWireKeys.SCHEMA_HINT] = root[AIcCredentialWireKeys.SCHEMA_HINT]
+        for entry in entries:
+            if not isinstance(entry, Mapping):
+                raise AIxCredentialException('Credential Profile list items must be objects.')
+            identity = entry.get('Id')
+            if not isinstance(identity, str) or not identity:
+                raise AIxCredentialException('Credential Profile list item requires string Id.')
+            if identity in normalized:
+                raise AIxCredentialException('Duplicate credential Profile Id ' + repr(identity))
+            normalized[identity] = {key: value for key, value in entry.items() if key != 'Id'}
+        return normalized
 
     def _parse_mapping(self, root: object, format_name: str) -> AIcCredentialDocument:
         if not isinstance(root, Mapping):
             raise AIxCredentialException(f"Credential document must contain a {format_name} object at its root.")
+        root = self._normalize_profile_list(root, format_name)
         profiles: dict[str, dict[AInCredentialType, dict[AInCredentialField, AIcCredentialValueReference]]] = {}
         for profile_id, profile_node in root.items():
-            if profile_id == AIigCredentials_1.SCHEMA_FIELD_NAME__SCHEMA:
+            if profile_id == AIcCredentialWireKeys.SCHEMA_HINT:
                 if not isinstance(profile_node, str):
                     raise AIxCredentialException("Credential document '$schema' must be a string.")
                 continue
@@ -172,16 +225,30 @@ class AIcCredentialDocumentReader:
     ) -> AIcCredentialValueReference:
         if not isinstance(node, Mapping):
             raise self._field_error(profile_id, credential_type, field, "must be an object containing Source and Value.")
-        if set(node.keys()) != {AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE, AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE}:
+        # The canonical schema uses Source/Value directly. The old tagged
+        # Choice envelope remains accepted only for migration of existing docs.
+        variant_name = None
+        if len(node) == 1:
+            candidate, payload = next(iter(node.items()))
+            if candidate in {member.choice_variant for member in AInCredentialValueSource}:
+                if not isinstance(payload, Mapping):
+                    raise self._field_error(profile_id, credential_type, field,
+                                            f"Choice alternative '{candidate}' must contain an object.")
+                variant_name, node = candidate, payload
+        if set(node.keys()) != {AIcCredentialWireKeys.SOURCE, AIcCredentialWireKeys.VALUE}:
             raise self._field_error(profile_id, credential_type, field, "must contain exactly Source and Value.")
-        source_value = node.get(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE)
-        reference = node.get(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE)
+        source_value = node.get(AIcCredentialWireKeys.SOURCE)
+        reference = node.get(AIcCredentialWireKeys.VALUE)
         if not isinstance(source_value, str):
             raise self._field_error(profile_id, credential_type, field, "is missing string property 'Source'.")
         if not isinstance(reference, str):
             raise self._field_error(profile_id, credential_type, field, "is missing string property 'Value'.")
         try:
-            return AIcCredentialValueReference(AInCredentialValueSource.from_id(source_value), reference)
+            source = AInCredentialValueSource.from_id(source_value)
+            if variant_name is not None and source.choice_variant != variant_name:
+                raise self._field_error(profile_id, credential_type, field,
+                                        f"Choice alternative '{variant_name}' conflicts with Source '{source_value}'.")
+            return AIcCredentialValueReference(source, reference)
         except ValueError as exception:
             raise self._field_error(profile_id, credential_type, field, str(exception)) from exception
 
@@ -219,7 +286,7 @@ class AIcCredentialDocumentReader:
                             f"'{field.id}'."
                         )
                     children = list(field_element)
-                    if [child.tag for child in children] != [AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE, AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE]:
+                    if [child.tag for child in children] != [AIcCredentialWireKeys.SOURCE, AIcCredentialWireKeys.VALUE]:
                         raise self._field_error(
                             profile_id,
                             credential_type,

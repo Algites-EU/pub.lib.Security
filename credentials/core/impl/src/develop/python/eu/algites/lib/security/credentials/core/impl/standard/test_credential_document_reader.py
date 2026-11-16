@@ -92,3 +92,43 @@ def test_explicit_readers():
     _assert_basic(reader.read_json(JSON_DOCUMENT))
     _assert_basic(reader.read_yaml(YAML_DOCUMENT))
     _assert_basic(reader.read_xml(XML_DOCUMENT))
+
+
+def test_credentials_profiles_are_nonempty_across_all_formats():
+    """XSD 1.0 xs:all cannot require one child; runtime enforces JSON minProperties."""
+    reader = AIcCredentialDocumentReader()
+    for load, source in (
+        (reader.read_json, '{"profile": {}}'),
+        (reader.read_yaml, 'profile: {}\n'),
+        (reader.read_xml, '<CredentialDocument><Profile Id="profile"/></CredentialDocument>'),
+    ):
+        with pytest.raises(AIxCredentialException, match='at least one type'):
+            load(source)
+
+
+def test_credentials_allow_distinct_types_but_reject_duplicate_types():
+    """JSON/YAML maps and XML xs:all describe the same unique type set."""
+    reader = AIcCredentialDocumentReader()
+    basic = {"Username": {"Source": "direct_value", "Value": "user"},
+             "Password": {"Source": "direct_value", "Value": "password"}}
+    bearer = {"Token": {"Source": "direct_value", "Value": "token"}}
+    import yaml
+    for load, source in (
+        (reader.read_json, json.dumps({"profile": {"Basic": basic, "Bearer": bearer}})),
+        (reader.read_yaml, yaml.safe_dump({"profile": {"Basic": basic, "Bearer": bearer}})),
+        (reader.read_xml, XML_DOCUMENT.replace('</Profile>',
+            '<Bearer><Token><Source>direct_value</Source><Value>token</Value></Token></Bearer></Profile>')),
+    ):
+        profile = load(source)
+        assert profile.get_credential_values('profile', AInCredentialType.BASIC)
+        assert profile.get_credential_values('profile', AInCredentialType.BEARER)
+
+    for load, source in (
+        (reader.read_json, '{"profile":{"Basic":{},"Basic":{}}}'),
+        (reader.read_yaml, 'profile:\n  Basic: {}\n  Basic: {}\n'),
+        (reader.read_xml, XML_DOCUMENT.replace('</Profile>',
+            '<Basic><Username><Source>direct_value</Source><Value>x</Value></Username>'
+            '<Password><Source>direct_value</Source><Value>p</Value></Password></Basic></Profile>')),
+    ):
+        with pytest.raises(AIxCredentialException, match='[Dd]uplicate'):
+            load(source)

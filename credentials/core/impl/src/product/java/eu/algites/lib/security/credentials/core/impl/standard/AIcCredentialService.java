@@ -1,22 +1,18 @@
 package eu.algites.lib.security.credentials.core.impl.standard;
 
 import eu.algites.lib.security.credentials.core.AIcCredentialDocument;
-import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
+import eu.algites.lib.security.credentials.core.AIcCredentialWireKeys;
 
-import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
 
-import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
 
-import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
 
-import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
 
-import eu.algites.lib.security.credentials.core.AIigCredentialValueSourceFields_1;
 
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import eu.algites.lib.security.credentials.core.AIcCredential;
 import eu.algites.lib.security.credentials.core.AIcCredentialProfile;
 import eu.algites.lib.security.credentials.core.AInCredentialField;
@@ -87,8 +83,8 @@ public final class AIcCredentialService {
             char[] locChars = locValue.get();
             try {
                 ObjectNode locFieldNode = OBJECT_MAPPER.createObjectNode();
-                locFieldNode.put(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE, AInCredentialValueSource.DIRECT_VALUE.getId());
-                locFieldNode.put(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE, new String(locChars));
+                locFieldNode.put(AIcCredentialWireKeys.SOURCE, AInCredentialValueSource.DIRECT_VALUE.getId());
+                locFieldNode.put(AIcCredentialWireKeys.VALUE, new String(locChars));
                 locTypedCredential.set(locField.getId(), locFieldNode);
             } finally {
                 Arrays.fill(locChars, '\0');
@@ -209,8 +205,8 @@ public final class AIcCredentialService {
                 ObjectNode locTypedCredential = OBJECT_MAPPER.createObjectNode();
                 locFields.forEach((locField, locReference) -> {
                     ObjectNode locFieldNode = OBJECT_MAPPER.createObjectNode();
-                    locFieldNode.put(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__SOURCE, locReference.getSource().getId());
-                    locFieldNode.put(AIigCredentialValueSourceFields_1.SCHEMA_FIELD_NAME__VALUE, locReference.getValue());
+                    locFieldNode.put(AIcCredentialWireKeys.SOURCE, locReference.getSource().getId());
+                    locFieldNode.put(AIcCredentialWireKeys.VALUE, locReference.getValue());
                     locTypedCredential.set(locField.getId(), locFieldNode);
                 });
                 locProfile.set(locType.getPropertyName(), locTypedCredential);
@@ -220,10 +216,30 @@ public final class AIcCredentialService {
         return locRoot;
     }
 
+    private static ObjectNode asCanonicalDocument(ObjectNode aLegacyMap) {
+        ObjectNode locDocument = OBJECT_MAPPER.createObjectNode();
+        ArrayNode locProfiles = locDocument.putArray("Profile");
+        aLegacyMap.fields().forEachRemaining(locField -> {
+            if (AIcCredentialWireKeys.SCHEMA_HINT.equals(locField.getKey())) {
+                locDocument.set(AIcCredentialWireKeys.SCHEMA_HINT, locField.getValue());
+                return;
+            }
+            if (!(locField.getValue() instanceof ObjectNode locProfile)) {
+                throw new AIxCredentialException("Invalid stored credential profile '" + locField.getKey() + "'.");
+            }
+            ObjectNode locEntry = OBJECT_MAPPER.createObjectNode();
+            locEntry.put("Id", locField.getKey());
+            locProfile.fields().forEachRemaining(locEntryField -> locEntry.set(
+                locEntryField.getKey(), locEntryField.getValue()));
+            locProfiles.add(locEntry);
+        });
+        return locDocument;
+    }
+
     private void writeCredentialDocumentObject(ObjectNode aRoot) {
         byte[] locEncoded;
         try {
-            locEncoded = OBJECT_MAPPER.writeValueAsBytes(aRoot);
+            locEncoded = OBJECT_MAPPER.writeValueAsBytes(asCanonicalDocument(aRoot));
         } catch (IOException aException) {
             throw new AIxCredentialException("Cannot serialize ALGITES_DEVOPS_BUILD_REPOSITORY_CREDENTIALS.", aException);
         }

@@ -70,6 +70,38 @@ Gradle coordinates all TechnologyKinds, shared definitions, validation, testing,
 
 ---
 
+### Native code generation and bootstrap consistency
+
+The transitional standalone bootstrap now runs a mandatory, **fail-closed**
+source-generation stage after publication planning and before compilation:
+
+1. Verify that the explicitly selected Defs/SDO generators and naming resources
+   are available. Local mode requires published `pub.tool.General` 1.1 artifacts
+   under `$MODUSTRO_HOME/artifact-repos`. An explicit source checkout can be
+   selected with `MODUSTRO_BOOTSTRAP_CODEGEN_SOURCE` for the Python stage.
+2. Empty every `src/<branch>/java.gen` and `src/<branch>/python.gen` directory.
+   **Do not clear `config.gen` or other non-technology outputs yet.** Never
+   change handwritten `src/product/java`, `python`, or schema directories.
+3. Generate fresh Defs contracts for Java/Python and Python SDO classes; the
+   Java SDO CLI runs as a separate staged Gradle JavaExec task from the pinned
+   `pub.tool.General` 1.1 Maven dependency after compiling the contracts.
+4. Run the ordinary test, Maven and Python packaging, verification and
+   publication stages only when all generators succeeded.
+
+`--plan-only` remains non-mutating. `--prepare-only` produces and validates
+local artifacts but never uploads to Cloudsmith. A missing generator or
+unregistered generated directory is a hard error, never a reason to compile
+stale `.gen` source files. The current Java SDO CLI version defaults to
+`1.1-SNAPSHOT` and may be pinned using `MODUSTRO_BOOTSTRAP_CODEGEN_VERSION`.
+
+The credentials XML representation uses **XSD 1.0** and `xs:all`, matching the
+four optional, non-repeating credential properties of JSONDEFS/YAMLDEFS.
+The requirement that at least one type be present is enforced by the Java
+and Python `AIcCredentialDocument` validation after unmarshalling. The
+XML schema cannot express that particular constraint with an `xs:all`
+of four optional children. All credential-document parsers reject repeated
+JSON/YAML object keys or duplicate XML credential elements.
+
 ### Standalone Security bootstrap (1.1)
 
 Security products built with the current generators use the **1.1** release line
@@ -102,20 +134,16 @@ implicitly enabled. The locally staged JARs, POMs, Gradle metadata and source
 JARs are verified before promotion. Full integration tests require Gradle 9.2.1
 and the required upstream dependency artifacts.
 
-**Generation migration prerequisite:** this standalone transitional bootstrap
-packages the `src/product/*.gen` trees present in the checkout; it does not yet
-regenerate them using the new Defs/SDO 1.1 CLI. The former
-`AIcSchemaObjectBindingsGenerator` entry point in the historical
-`gradle/schema-bindings.gradle.kts` is no longer available. Consequently,
-`--prepare-only` alone does not prove that all generated contracts represent
-the new generator model. Regenerate and verify them against the published
-`pub.tool.General` 1.1 toolchain before uploading Security 1.1 to Cloudsmith.
-Do not edit generated source files manually.
+The old `gradle/schema-bindings.gradle.kts` mechanism is historical and
+still refers to the removed `AIcSchemaObjectBindingsGenerator` entry point.
+The standalone bootstrap does **not** apply that obsolete script: it uses the
+new explicit `devops/codegen/defs-security.json` configuration and the current
+1.1 Defs/SDO CLIs. Do not edit generated source files manually.
 
 The current descriptors declare **five Java products and one Python product**:
 `credentials/core/intf` is Java/Python while `credentials/core/impl` and the
-three OS-specific secure stores remain Java-only. Existing but disabled Python
-implementation sources are deliberately not packaged or regenerated.
+three OS-specific secure stores remain Java-only. The Python implementation is regenerated for source consistency, but
+remains disabled as a distributable product by its artifact descriptor.
 
 ## 🔄 Continuous Integration (Algites CI)
 

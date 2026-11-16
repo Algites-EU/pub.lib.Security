@@ -23,10 +23,10 @@ def test_storing_credential_preserves_canonical_field_ids():
     profile = AIcCredentialProfile("example", AInCredentialType.BASIC)
     with AIcCredential({AInCredentialField.USERNAME: "u", AInCredentialField.PASSWORD: "p"}) as credential:
         service.store(profile, credential)
-    assert json.loads(store.document) == {"example": {"Basic": {
+    assert json.loads(store.document) == {"Profile": [{"Id": "example", "Basic": {
         "Username": {"Source": "direct_value", "Value": "u"},
         "Password": {"Source": "direct_value", "Value": "p"},
-    }}}
+    }}]}
 
 
 def test_storing_document_preserves_value_source_ids():
@@ -34,4 +34,6 @@ def test_storing_document_preserves_value_source_ids():
     service = AIcCredentialService(store)
     document = {"example": {"Bearer": {"Token": {"Source": "secret_content", "Value": "TOKEN_SECRET"}}}}
     service.store_credential_document(json.dumps(document))
-    assert json.loads(store.document) == document
+    assert json.loads(store.document) == {"Profile": [{"Id": "example", "Bearer": {"Token": {
+        "Source": "secret_content", "Value": "TOKEN_SECRET"
+    }}}]}
