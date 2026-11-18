@@ -1,0 +1,1 @@
+packageSearchIndex = [{"l":"All Packages","u":"allpackages-index.html"},{"l":"eu.algites.lib.security.credentials.core"},{"l":"eu.algites.lib.security.credentials.core.xmldefs"}];updateSearchResults();
