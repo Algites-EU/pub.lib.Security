@@ -8,7 +8,7 @@ import pytest
 
 XSD = (Path(__file__).resolve().parents[2] / 'product' / 'xmldefs'
        / 'eu' / 'algites' / 'lib' / 'security' / 'credentials' / 'core'
-       / 'credentials_1.xsd')
+       / 'credential-document_1.xsd')
 XS = '{http://www.w3.org/2001/XMLSchema}'
 
 
@@ -33,7 +33,8 @@ def test_actual_xsd_accepts_distinct_types_and_rejects_duplicates():
     bearer = ('<Bearer><Token><Source>direct_value</Source><Value>t</Value>'
               '</Token></Bearer>')
     def document(content):
-        return etree.fromstring(('<CredentialDocument><Profile Id="main">'
+        namespace = 'https://defs.dev.algites.eu/api/xmldefs/eu/algites/lib/security/credentials/core/credential-document_1.xsd'
+        return etree.fromstring(('<CredentialDocument xmlns="' + namespace + '"><Profile Id="main">'
                                  + content + '</Profile></CredentialDocument>').encode())
     assert validator.validate(document(basic))
     assert validator.validate(document(bearer + basic))
@@ -46,18 +47,26 @@ def test_profile_variants_match_json_and_yaml_contracts():
     import json
     source = next(parent for parent in XSD.parents if parent.name == 'product')
     def profile(kind, suffix):
-        definition = next((source / kind).rglob(f'credentials_1.{suffix}.schema.json'))
-        return json.loads(definition.read_text(encoding='utf-8'))['$defs']['profileValues']
+        definition = next((source / kind).rglob(f'credential-document_1.{suffix}.schema.json'))
+        return json.loads(definition.read_text(encoding='utf-8'))
 
     json_profile = profile('jsondefs', 'jsondef')
     yaml_profile = profile('yamldefs', 'yamldef')
-    assert json_profile == yaml_profile
-    assert json_profile['type'] == 'object'
-    assert json_profile['additionalProperties'] is False
-    assert json_profile['minProperties'] == 1
+    assert {k: v for k, v in json_profile.items() if k not in ('$id', 'title')} == {k: v for k, v in yaml_profile.items() if k not in ('$id', 'title')}
+    assert '/api/jsondefs/' in json_profile['$id']
+    assert '/api/yamldefs/' in yaml_profile['$id']
+    assert json_profile['$ref'] == '#/$defs/CredentialDocument'
+    assert json_profile['x-algites-schema-id'] == 'eu.algites.lib.security.credentials.core.credential-document'
+    assert 'x-algites-defscodegen-root-type-name' not in json_profile
+    doc = json_profile['$defs']['CredentialDocument']
+    assert doc['type'] == 'object'
+    assert doc['additionalProperties'] is False
+    assert list(doc['properties']) == ['$schema', 'Profile']
+    assert doc['properties']['Profile']['items']['$ref'] == '#/$defs/ProfileType'
     xml_profile = next(node for node in ET.parse(XSD).getroot().findall(f'{XS}complexType')
                        if node.get('name') == 'ProfileType')
     xml_fields = xml_profile.find(f'{XS}all').findall(f'{XS}element')
-    assert set(json_profile['properties']) == {node.get('name') for node in xml_fields}
+    assert {name for name in doc['properties'] if name != '$schema'} == {'Profile'}
+    assert {node.get('name') for node in xml_fields} == {'Basic', 'Bearer', 'ApiKey', 'Certificate'}
     assert all(node.get('maxOccurs') == '1' and node.get('minOccurs') == '0'
                for node in xml_fields)

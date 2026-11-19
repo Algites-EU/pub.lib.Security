@@ -80,7 +80,7 @@ public final class AItcCredentialDocumentReaderTest {
     @Test
     public void testRootSchemaHintIsNotACredentialProfile() {
         AIcCredentialDocumentReader locReader = new AIcCredentialDocumentReader();
-        String locSchemaUri = "https://defs.dev.algites.eu/api/yamldefs/eu/algites/lib/security/credentials/core/credentials_1.yamldef.schema.json";
+        String locSchemaUri = "https://defs.dev.algites.eu/api/yamldefs/eu/algites/lib/security/credentials/core/credential-document_1.yamldef.schema.json";
         AIcCredentialDocument locJsonDocument = locReader.readJson(
             "{\"$schema\":\"" + locSchemaUri + "\"," + JSON_DOCUMENT.substring(1));
         AIcCredentialDocument locYamlDocument = locReader.readYaml("$schema: " + locSchemaUri + "\n" + YAML_DOCUMENT);

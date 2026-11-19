@@ -15,7 +15,7 @@ SCHEMA_ROOT = Path(__file__).resolve().parents[12] / 'intf/src/product/jsondefs'
 
 def test_external_validator_and_reader_accept_canonical_profile_list():
     """Both JSON Schema and reader accept explicit Profile Id and Source/Value."""
-    schema = json.loads(next(SCHEMA_ROOT.rglob('credentials_1.jsondef.schema.json')).read_text())
+    schema = json.loads(next(SCHEMA_ROOT.rglob('credential-document_1.jsondef.schema.json')).read_text())
     instance = {'Profile': [{'Id': 'example', 'Bearer': {'Token': {
         'Source': 'secret_content', 'Value': 'EXAMPLE_REFERENCE'
     }}}]}

@@ -51,7 +51,7 @@ def _assert_basic(document):
 
 def test_root_schema_hint_is_not_a_credential_profile():
     reader = AIcCredentialDocumentReader()
-    schema_uri = "https://defs.dev.algites.eu/api/yamldefs/eu/algites/lib/security/credentials/core/credentials_1.yamldef.schema.json"
+    schema_uri = "https://defs.dev.algites.eu/api/yamldefs/eu/algites/lib/security/credentials/core/credential-document_1.yamldef.schema.json"
     json_document = reader.read_json(json.dumps({"$schema": schema_uri, **json.loads(JSON_DOCUMENT)}))
     yaml_document = reader.read_yaml("$schema: " + schema_uri + "\n" + YAML_DOCUMENT)
     _assert_basic(json_document)

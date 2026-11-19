@@ -14,7 +14,7 @@ The OS stores are currently Java-only. This is intentional: multi-TechnologyKind
 
 ## XSD 1.0 credential variant cardinality
 
-`credentials_1.xsd` uses `xs:all` for `ProfileType` to mirror the
+`credential-document_1.xsd` uses `xs:all` for `ProfileType` to mirror the
 JSONDEFS/YAMLDEFS `profileValues` object: `Basic`, `Bearer`, `ApiKey`, and
 `Certificate` are independent optional properties, each present zero or one
 time. Order is immaterial. Multiple different mechanisms can coexist under
@@ -27,3 +27,12 @@ runtime. The XSD is kept at version 1.0 without `xs:assert`.
 The XSD-only global `ProfileIdType` in `credential-profiles_1.xsd` is called
 `CredentialProfileIdType` to avoid two distinct generated contracts with the
 same nominal name when both XSD documents share a package.
+
+The `credential-document_1` XMLDEFS, JSONDEFS and YAMLDEFS sources
+represent the same `CredentialDocument` business contract. XML declares a
+root `xs:element` named `CredentialDocument`; JSONDEFS/YAMLDEFS declare
+`$defs.CredentialDocument` and reference it from the document root. The
+Defs Codegen therefore does not need a root-name override. The corresponding
+source files, publication paths and logical schema ID all use
+`credential-document` consistently. `x-algites-defscodegen-root-type-name`
+remains a supported *optional* override for other source contracts.
